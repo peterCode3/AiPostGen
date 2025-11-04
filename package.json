@@ -1,23 +1,56 @@
 {
-  "name": "aipostgen",
-  "version": "0.1.0",
-  "private": true,
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start"
-  },
-  "dependencies": {
-    "react": "19.1.0",
-    "react-dom": "19.1.0",
-    "next": "15.5.4"
+    "dev": "concurrently \"next dev\" \"npm run worker:dev --once\"",
+    "worker:dev": "concurrently \"tsx workers/scrape.ts\" \"tsx workers/generate.ts\"",
+    "build": "next build && tsc -p tsconfig.json --noEmit",
+    "start": "next start",
+    "lint": "eslint . --ext .ts,.tsx",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "clean": "rimraf .next",
+    "type": "module"
   },
   "devDependencies": {
-    "typescript": "^5",
-    "@types/node": "^20",
-    "@types/react": "^19",
-    "@types/react-dom": "^19",
-    "@tailwindcss/postcss": "^4",
-    "tailwindcss": "^4"
+    "@tailwindcss/forms": "^0.5.10",
+    "@tailwindcss/postcss": "^4.1.14",
+    "@tailwindcss/typography": "^0.5.19",
+    "@types/node": "^24.6.0",
+    "@types/react": "19.1.16",
+    "autoprefixer": "^10.4.21",
+    "concurrently": "^9.2.1",
+    "postcss": "^8.5.6",
+    "rimraf": "^6.0.1",
+    "tailwindcss": "^4.1.14",
+    "ts-node": "^10.9.2",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3"
+  },
+  "dependencies": {
+    "@google/generative-ai": "^0.24.1",
+    "bullmq": "^4.18.3",
+    "cheerio": "^1.1.2",
+    "cloudinary": "^2.7.0",
+    "date-fns": "^3.6.0",
+    "dotenv": "^17.2.3",
+    "formidable": "^3.5.4",
+    "framer-motion": "^12.23.22",
+    "got": "^14.4.9",
+    "gpt4all": "^4.0.0",
+    "groq-sdk": "^0.33.0",
+    "ioredis": "^5.8.0",
+    "jsonwebtoken": "^9.0.2",
+    "lucide-react": "^0.544.0",
+    "marked": "^16.4.0",
+    "mongoose": "^8.18.3",
+    "next": "^15.5.4",
+    "openai": "^5.23.2",
+    "p-limit": "^5.0.0",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1",
+    "react-hot-toast": "^2.6.0",
+    "react-markdown": "^10.1.0",
+    "react-select": "^5.10.2",
+    "remark-gfm": "^4.0.1",
+    "scrapegraph-js": "^0.1.7",
+    "zod": "^3.25.76"
   }
 }

@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI PostGen - Design System Color Palette</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      padding: 48px 24px;
+      min-height: 100vh;
+    }
+    
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    
+    .header {
+      text-align: center;
+      color: white;
+      margin-bottom: 48px;
+    }
+    
+    .header h1 {
+      font-size: 48px;
+      font-weight: 700;
+      margin-bottom: 12px;
+      text-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    }
+    
+    .header p {
+      font-size: 20px;
+      opacity: 0.9;
+    }
+    
+    .palette-section {
+      background: white;
+      border-radius: 16px;
+      padding: 32px;
+      margin-bottom: 24px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+    }
+    
+    .section-title {
+      font-size: 24px;
+      font-weight: 700;
+      color: #111827;
+      margin-bottom: 24px;
+      padding-bottom: 12px;
+      border-bottom: 3px solid #2563eb;
+    }
+    
+    .color-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 20px;
+    }
+    
+    .color-card {
+      border-radius: 12px;
+      overflow: hidden;
+      border: 1px solid #e5e7eb;
+      transition: all 0.3s;
+      cursor: pointer;
+    }
+    
+    .color-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 8px 16px rgba(0,0,0,0.1);
+    }
+    
+    .color-swatch {
+      height: 120px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      position: relative;
+    }
+    
+    .color-info {
+      padding: 16px;
+      background: #f9fafb;
+    }
+    
+    .color-name {
+      font-size: 16px;
+      font-weight: 600;
+      color: #111827;
+      margin-bottom: 8px;
+    }
+    
+    .color-hex {
+      font-size: 14px;
+      color: #6b7280;
+      font-family: 'Monaco', monospace;
+    }
+    
+    .color-usage {
+      font-size: 12px;
+      color: #9ca3af;
+      margin-top: 8px;
+      font-style: italic;
+    }
+    
+    .copy-notification {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background: #16a34a;
+      color: white;
+      padding: 16px 24px;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+      opacity: 0;
+      transform: translateY(20px);
+      transition: all 0.3s;
+      pointer-events: none;
+    }
+    
+    .copy-notification.show {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    
+    .usage-example {
+      background: #f9fafb;
+      border-radius: 12px;
+      padding: 24px;
+      margin-top: 24px;
+      border: 2px dashed #d1d5db;
+    }
+    
+    .usage-example h3 {
+      font-size: 18px;
+      color: #111827;
+      margin-bottom: 16px;
+    }
+    
+    .code-block {
+      background: #1f2937;
+      color: #f9fafb;
+      padding: 16px;
+      border-radius: 8px;
+      font-family: 'Monaco', monospace;
+      font-size: 14px;
+      overflow-x: auto;
+      white-space: pre-wrap;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>🎨 AI PostGen Color Palette</h1>
+      <p>Unified Design System - Click any color to copy</p>
+    </div>
+    
+    <!-- Primary Colors -->
+    <div class="palette-section">
+      <h2 class="section-title">Primary Brand Colors</h2>
+      <div class="color-grid">
+        <div class="color-card" onclick="copyColor('#2563eb', 'Primary Blue')">
+          <div class="color-swatch" style="background: #2563eb; color: white;">🔵</div>
+          <div class="color-info">
+            <div class="color-name">Primary</div>
+            <div class="color-hex">#2563eb</div>
+            <div class="color-usage">Buttons, Links, Active States</div>
+          </div>
+        </div>
+        
+        <div class="color-card" onclick="copyColor('#1d4ed8', 'Primary Dark')">
+          <div class="color-swatch" style="background: #1d4ed8; color: white;">🔷</div>
+          <div class="color-info">
+            <div class="color-name">Primary Dark</div>
+            <div class="color-hex">#1d4ed8</div>
+            <div class="color-usage">Hover States</div>
+          </div>
+        </div>
+        
+        <div class="color-card" onclick="copyColor('#eff6ff', 'Primary Light')">
+          <div class="color-swatch" style="background: #eff6ff; color: #1d4ed8;">💠</div>
+          <div class="color-info">
+            <div class="color-name">Primary 50</div>
+            <div class="color-hex">#eff6ff</div>
+            <div class="color-usage">Backgrounds</div>
+          </div>
+        </div>
+        
+        <div class="color-card" onclick="copyColor('#dbeafe', 'Primary 100')">
+          <div class="color-swatch" style="background: #dbeafe; color: #1d4ed8;">🔹</div>
+          <div class="color-info">
+            <div class="color-name">Primary 100</div>
+            <div class="color-hex">#dbeafe</div>
+            <div class="color-usage">Light Backgrounds</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Success Colors -->
+    <div class="palette-section">
+      <h2 class="section-title">Success Colors</h2>
+      <div class="color-grid">
+        <div class="color-card" onclick="copyColor('#16a34a', 'Success Green')">
+          <div class="color-swatch" style="background: #16a34a; color: white;">✅</div>
+          <div class="color-info">
+            <div class="color-name">Success</div>
+            <div class="color-hex">#16a34a</div>
+            <div class="color-usage">Publish, Approve, Success</div>
+          </div>
+        </div>
+        
+        <div class="color-card" onclick="copyColor('#15803d', 'Success Dark')">
+          <div class="color-swatch" style="background: #15803d; color: white;">🟢</div>
+          <div class="color-info">
+            <div class="color-name">Success Dark</div>
+            <div class="color-hex">#15803d</div>
+            <div class="color-usage">Hover States</div>
+          </div>
+        </div>
+        
+        <div class="color-card" onclick="copyColor('#dcfce7', 'Success Light')">
+          <div class="color-swatch" style="background: #dcfce7; color: #15803d;">💚</div>
+          <div class="color-info">
+            <div class="color-name">Success 100</div>
+            <div class="color-hex">#dcfce7</div>
+            <div class="color-usage">Backgrounds, Badges</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Danger Colors -->
+    <div class="palette-section">
+      <h2 class="section-title">Danger Colors</h2>
+      <div class="color-grid">
+        <div class="color-card" onclick="copyColor('#dc2626', 'Danger Red')">
+          <div class="color-swatch" style="background: #dc2626; color: white;">❌</div>
+          <div class="color-info">
+            <div class="color-name">Danger</div>
+            <div class="color-hex">#dc2626</div>
+            <div class="color-usage">Delete, Reject, Error</div>
+          </div>
+        </div>
+        
+        <div class="color-card" onclick="copyColor('#b91c1c', 'Danger Dark')">
+          <div class="color-swatch" style="background: #b91c1c; color: white;">🔴</div>
+          <div class="color-info">
+            <div class="color-name">Danger Dark</div>
+            <div class="color-hex">#b91c1c</div>
+            <div class="color-usage">Hover States</div>
+          </div>
+        </div>
+        
+        <div class="color-card" onclick="copyColor('#fee2e2', 'Danger Light')">
+          <div class="color-swatch" style="background: #fee2e2; color: #b91c1c;">❤️</div>
+          <div class="color-info">
+            <div class="color-name">Danger 100</div>
+            <div class="color-hex">#fee2e2</div>
+            <div class="color-usage">Backgrounds, Alerts</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Warning Colors -->
+    <div class="palette-section">
+      <h2 class="section-title">Warning Colors</h2>
+      <div class="color-grid">
+        <div class="color-card" onclick="copyColor('#f59e0b', 'Warning Orange')">
+          <div class="color-swatch" style="background: #f59e0b; color: white;">⚠️</div>
+          <div class="color-info">
+            <div class="color-name">Warning</div>
+            <div class="color-hex">#f59e0b</div>
+            <div class="color-usage">Review, Pending</div>
+          </div>
+        </div>
+        
+        <div class="color-card" onclick="copyColor('#d97706', 'Warning Dark')">
+          <div class="color-swatch" style="background: #d97706; color: white;">🟠</div>
+          <div class="color-info">
+            <div class="color-name">Warning Dark</div>
+            <div class="color-hex">#d97706</div>
+            <div class="color-usage">Hover States</div>
+          </div>
+        </div>
+        
+        <div class="color-card" onclick="copyColor('#fef3c7', 'Warning Light')">
+          <div class="color-swatch" style="background: #fef3c7; color: #d97706;">🟡</div>
+          <div class="color-info">
+            <div class="color-name">Warning 100</div>
+            <div class="color-hex">#fef3c7</div>
+            <div class="color-usage">Backgrounds, Badges</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Neutral Colors -->
+    <div class="palette-section">
+      <h2 class="section-title">Neutral Colors</h2>
+      <div class="color-grid">
+        <div class="color-card" onclick="copyColor('#ffffff', 'White')">
+          <div class="color-swatch" style="background: #ffffff; color: #111827; border: 1px solid #e5e7eb;">⚪</div>
+          <div class="color-info">
+            <div class="color-name">White</div>
+            <div class="color-hex">#ffffff</div>
+            <div class="color-usage">Cards, Backgrounds</div>
+          </div>
+        </div>
+        
+        <div class="color-card" onclick="copyColor('#f9fafb', 'Gray 50')">
+          <div class="color-swatch" style="background: #f9fafb; color: #111827;">⬜</div>
+          <div class="color-info">
+            <div class="color-name">Gray 50</div>
+            <div class="color-hex">#f9fafb</div>
+            <div class="color-usage">Page Background</div>
+          </div>
+        </div>
+        
+        <div class="color-card" onclick="copyColor('#f3f4f6', 'Gray 100')">
+          <div class="color-swatch" style="background: #f3f4f6; color: #111827;">◻️</div>
+          <div class="color-info">
+            <div class="color-name">Gray 100</div>
+            <div class="color-hex">#f3f4f6</div>
+            <div class="color-usage">Subtle Backgrounds</div>
+          </div>
+        </div>
+        
+        <div class="color-card" onclick="copyColor('#e5e7eb', 'Gray 200')">
+          <div class="color-swatch" style="background: #e5e7eb; color: #111827;">▫️</div>
+          <div class="color-info">
+            <div class="color-name">Gray 200</div>
+            <div class="color-hex">#e5e7eb</div>
+            <div class="color-usage">Borders</div>
+          </div>
+        </div>
+        
+        <div class="color-card" onclick="copyColor('#6b7280', 'Gray 500')">
+          <div class="color-swatch" style="background: #6b7280; color: white;">🔘</div>
+          <div class="color-info">
+            <div class="color-name">Gray 500</div>
+            <div class="color-hex">#6b7280</div>
+            <div class="color-usage">Secondary Text</div>
+          </div>
+        </div>
+        
+        <div class="color-card" onclick="copyColor('#374151', 'Gray 700')">
+          <div class="color-swatch" style="background: #374151; color: white;">⚫</div>
+          <div class="color-info">
+            <div class="color-name">Gray 700</div>
+            <div class="color-hex">#374151</div>
+            <div class="color-usage">Body Text</div>
+          </div>
+        </div>
+        
+        <div class="color-card" onclick="copyColor('#111827', 'Gray 900')">
+          <div class="color-swatch" style="background: #111827; color: white;">⬛</div>
+          <div class="color-info">
+            <div class="color-name">Gray 900</div>
+            <div class="color-hex">#111827</div>
+            <div class="color-usage">Headings, Dark Text</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Usage Example -->
+    <div class="palette-section">
+      <div class="usage-example">
+        <h3>💡 CSS Variables Usage</h3>
+        <div class="code-block">/* Use these CSS variables in your code */
+
+.my-button {
+  background: var(--color-primary);
+  color: var(--color-white);
+  padding: var(--spacing-md);
+  border-radius: var(--radius-md);
+  transition: all var(--transition-base);
+}
+
+.my-button:hover {
+  background: var(--color-primary-dark);
+  box-shadow: var(--shadow-md);
+}
+
+.my-card {
+  background: var(--color-white);
+  border: 1px solid var(--color-gray-200);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-xl);
+  box-shadow: var(--shadow-sm);
+}
+
+.success-message {
+  background: var(--color-success-100);
+  color: var(--color-success-dark);
+  border: 1px solid var(--color-success);
+}</div>
+      </div>
+    </div>
+  </div>
+  
+  <div class="copy-notification" id="copyNotification">
+    ✅ Color copied to clipboard!
+  </div>
+  
+  <script>
+    function copyColor(hex, name) {
+      navigator.clipboard.writeText(hex).then(() => {
+        const notification = document.getElementById('copyNotification');
+        notification.textContent = `✅ ${name} (${hex}) copied!`;
+        notification.classList.add('show');
+        
+        setTimeout(() => {
+          notification.classList.remove('show');
+        }, 2000);
+      });
+    }
+  </script>
+</body>
+</html>
+
