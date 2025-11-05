@@ -242,7 +242,6 @@ export default function AdminLogin() {
         }
       `}</style>
 
-      <Toaster position="top-center" />
       
       <div className="login-container">
         <div className="login-card">
