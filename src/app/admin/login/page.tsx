@@ -252,11 +252,6 @@ export default function AdminLogin() {
             <p className="login-subtitle">Sign in to your admin dashboard</p>
           </div>
 
-          <div className="demo-credentials">
-            <p>📋 Demo Credentials</p>
-            <p>Email: <code>{email}</code></p>
-            <p>Password: <code>{password}</code></p>
-          </div>
 
           <form onSubmit={onSubmit}>
             <div className="form-group">
