@@ -6,12 +6,6 @@
 
 import mongoose from 'mongoose';
 
-const MONGODB_URI = process.env.MONGODB_URI || '';
-
-if (!MONGODB_URI) {
-  throw new Error('Please define MONGODB_URI in your .env.local file');
-}
-
 // Global variable to cache the connection
 let cached = (global as any).mongoose;
 
@@ -20,6 +14,13 @@ if (!cached) {
 }
 
 export async function dbConnect() {
+  // Check for MONGODB_URI at runtime, not import time
+  const MONGODB_URI = process.env.MONGODB_URI || '';
+  
+  if (!MONGODB_URI) {
+    throw new Error('Please define MONGODB_URI in your .env.local file');
+  }
+
   // Return cached connection if available
   if (cached.conn) {
     return cached.conn;
