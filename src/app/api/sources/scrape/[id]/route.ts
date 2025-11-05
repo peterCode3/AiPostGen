@@ -4,10 +4,10 @@ import Source from '@/lib/db/models/Source';
 import { requireRole } from '@/lib/auth/rbac';
 import { jsonError } from '@/lib/utils/errors';
 
-export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(_req: NextRequest, context: { params: Promise<{ id: string }> }) {
   const { ok, error } = requireRole(_req, ['admin','editor','contributor','viewer']);
   if (!ok) return jsonError(error, 401);
-  const { id } = await params;
+  const { id } = await context.params;
   await dbConnect();
   const src = await Source.findById(id).lean();
   if (!src) return jsonError('not found', 404);
