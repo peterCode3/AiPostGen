@@ -138,7 +138,7 @@ export default function GenerateContent() {
               isMulti
               options={keywords.map(k => ({ value: k._id, label: k.term }))}
               value={selectedKeywords}
-              onChange={(val) => setSelectedKeywords(val || [])}
+              onChange={(val) => setSelectedKeywords(val as any || [])}
               placeholder="🔍 Search and select keywords..."
               className="react-select-container"
               classNamePrefix="react-select"

@@ -147,6 +147,8 @@ export async function runAutoDentistFlow() {
 
   console.log('✨ Rephrased keywords:', rephrased);
 
+  const results = [];
+
   for (const term of rephrased) {
     const kw = await Keyword.findOneAndUpdate(
       { term },
@@ -163,10 +165,13 @@ export async function runAutoDentistFlow() {
     kw.used = true;
     kw.usedAt = new Date();
     await kw.save();
+    
+    results.push({ keyword: term, keywordId: String(kw._id) });
   }
 
 
   console.log('🎉 Auto Dentist Flow completed — articles queued for generation!');
+  return results;
 }
 
 if (require.main === module) {

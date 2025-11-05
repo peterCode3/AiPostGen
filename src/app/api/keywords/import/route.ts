@@ -52,7 +52,7 @@ export async function POST(req: NextRequest) {
       inserted: termsToInsert.length,
       upserted: result.upsertedCount || 0,
       modified: result.modifiedCount || 0,
-      keywords: insertedKeywords.map(k => ({
+      keywords: insertedKeywords.map((k: any) => ({
         _id: k._id.toString(),
         term: k.term
       }))

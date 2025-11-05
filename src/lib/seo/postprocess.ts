@@ -24,26 +24,27 @@ function injectInternalLinks(html: string, links: { href: string; anchor: string
 }
 
 export async function postProcessHTML(markdown: string, ctx: { keyword: string }) {
-  const html = mdToHtml(markdown);
-  const outline = Array.from(html.matchAll(/<h2>(.*?)<\/h2>/g)).map(m => ({ h: m[1], bullets: [] }));
+  const html = await mdToHtml(markdown);
+  const htmlStr = typeof html === 'string' ? html : String(html);
+  const outline = Array.from(htmlStr.matchAll(/<h2>(.*?)<\/h2>/g)).map(m => ({ h: m[1], bullets: [] }));
   const { internalLinks } = await findInternalLinks(ctx.keyword, outline);
   const meta = {
-    title: inferTitle(html),
-    description: summarize(html),
-    keywords: inferKeywords(html, ctx.keyword),
+    title: inferTitle(htmlStr),
+    description: summarize(htmlStr),
+    keywords: inferKeywords(htmlStr, ctx.keyword),
     seo: {
       internalLinks,
       schemaOrgJson: {
         '@context': 'https://schema.org',
         '@type': 'Article',
-        headline: inferTitle(html),
-        description: summarize(html),
-        keywords: inferKeywords(html, ctx.keyword),
+        headline: inferTitle(htmlStr),
+        description: summarize(htmlStr),
+        keywords: inferKeywords(htmlStr, ctx.keyword),
         datePublished: new Date().toISOString(),
         author: { "@type": "Organization", "name": "Your Brand" }
       }
     },
     outline
   };
-  return { html: injectInternalLinks(html, internalLinks), meta };
+  return { html: injectInternalLinks(htmlStr, internalLinks), meta };
 }

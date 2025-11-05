@@ -116,7 +116,7 @@ export default function ArticlePage() {
                 <h1>Edit Article: {data.title}</h1>
 
                 {/* SEO Widget */}
-                <SeoWidget title={data.metaTitle || data.title} description={data.metaDescription || ''} />
+                <SeoWidget metadata={data} />
 
                 {/* Metadata Editor */}
                 <div style={{ marginBottom: 16 }}>
@@ -155,7 +155,7 @@ export default function ArticlePage() {
                 {/* Sources */}
                 <div style={{ marginTop: 16 }}>
                     <h3>Sources:</h3>
-                    {data.sourceRefs?.map((src, idx) => (
+                    {data.sourceRefs?.map((src: any, idx: number) => (
                         <div key={idx} style={{ marginBottom: 8 }}>
                             <input
                                 type="text"
