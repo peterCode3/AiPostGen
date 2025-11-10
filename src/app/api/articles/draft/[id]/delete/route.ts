@@ -3,7 +3,7 @@ import { requireRole } from '@/lib/auth/rbac';
 import { dbConnect } from '@/lib/db/connect';
 import Article from '@/lib/db/models/Article';
 
-export async function DELETE(req: NextRequest, context: any) {
+export async function DELETE(req: NextRequest, context: { params: Promise<{ id: string }> }) {
   const auth = requireRole(req, ['admin', 'editor']);
   if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: 401 });
 
@@ -11,9 +11,15 @@ export async function DELETE(req: NextRequest, context: any) {
   if (!id) return NextResponse.json({ error: 'Article ID required' }, { status: 400 });
 
   await dbConnect();
-  const article = await Article.findById(id);
-  if (!article) return NextResponse.json({ error: 'Article not found' }, { status: 404 });
+  
+  try {
+    const article = await Article.findById(id);
+    if (!article) return NextResponse.json({ error: 'Article not found' }, { status: 404 });
 
-  await article.deleteOne();
-  return NextResponse.json({ message: 'Article deleted successfully' });
+    await article.deleteOne();
+    return NextResponse.json({ success: true, message: 'Article deleted successfully' });
+  } catch (error: any) {
+    console.error('[article:delete] Error:', error);
+    return NextResponse.json({ error: error.message || 'Delete failed' }, { status: 500 });
+  }
 }

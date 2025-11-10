@@ -4,14 +4,20 @@ import Article from '@/lib/db/models/Article';
 import { requireRole } from '@/lib/auth/rbac';
 import { jsonError } from '@/lib/utils/errors';
 
-export async function POST(req: NextRequest, context: any) {
+export async function POST(req: NextRequest, context: { params: Promise<{ id: string }> }) {
   const { id } = await context.params; 
   const auth = requireRole(req, ['admin', 'editor']);
   if (!auth.ok) return jsonError(auth.error, 401);
 
   await dbConnect();
-  const a = await Article.findByIdAndUpdate(id, { status: 'scheduled' }, { new: true }).lean();
-  if (!a) return jsonError('not found', 404);
+  
+  try {
+    const a = await Article.findByIdAndUpdate(id, { status: 'scheduled' }, { new: true }).lean();
+    if (!a) return jsonError('Article not found', 404);
 
-  return Response.json(a);
+    return Response.json({ success: true, article: a });
+  } catch (error: any) {
+    console.error('[article:approve] Error:', error);
+    return jsonError(error.message || 'Failed to approve article', 500);
+  }
 }

@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import AdminLayout from '@/components/AdminLayout';
 import Loading from '@/components/Loading';
@@ -12,8 +12,11 @@ export default function ArticlePage() {
   const [data, setData] = useState<any>(null);
   const [scheduleDate, setScheduleDate] = useState('');
   const [markdownContent, setMarkdownContent] = useState('');
+  const [featuredImage, setFeaturedImage] = useState('');
+  const [uploadingImage, setUploadingImage] = useState(false);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'edit' | 'preview' | 'seo'>('edit');
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
 
   useEffect(() => {
@@ -29,6 +32,7 @@ export default function ArticlePage() {
       const json = await res.json();
       setData(json);
       setMarkdownContent(json.content?.markdown || '');
+      setFeaturedImage(json.featuredImage || '');
     } catch (err) {
       toast.error('Error loading article ⚠️');
     }
@@ -49,7 +53,8 @@ export default function ArticlePage() {
           prompt: data.prompt, 
           regenerate, 
           language: data.language,
-          content: { markdown: markdownContent }
+          content: { markdown: markdownContent },
+          featuredImage: featuredImage
         }),
       });
 
@@ -58,11 +63,94 @@ export default function ArticlePage() {
       const updated = await res.json();
       setMarkdownContent(updated.content.markdown);
       setData(updated);
+      setFeaturedImage(updated.featuredImage || '');
       toast.success(regenerate ? '✅ Regenerated!' : '✅ Saved!', { id: 'save' });
     } catch (err) {
       toast.error('Failed to update', { id: 'save' });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const uploadImage = async (file: File): Promise<string> => {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const res = await fetch('/api/upload', {
+      method: 'POST',
+      body: formData,
+    });
+
+    const json = await res.json();
+    if (!res.ok) throw new Error(json.error || 'Upload failed');
+    return json.url;
+  };
+
+  const handleFeaturedImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please select an image file');
+      return;
+    }
+
+    setUploadingImage(true);
+    try {
+      const url = await uploadImage(file);
+      setFeaturedImage(url);
+      toast.success('✅ Featured image uploaded!');
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to upload image');
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
+  const handleInsertImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please select an image file');
+      return;
+    }
+
+    setUploadingImage(true);
+    try {
+      const url = await uploadImage(file);
+      
+      // Insert markdown image syntax at cursor position
+      const textarea = textareaRef.current;
+      if (textarea) {
+        const start = textarea.selectionStart;
+        const end = textarea.selectionEnd;
+        const imageMarkdown = `![${file.name}](${url})`;
+        const newContent = 
+          markdownContent.substring(0, start) + 
+          imageMarkdown + 
+          markdownContent.substring(end);
+        
+        setMarkdownContent(newContent);
+        
+        // Set cursor position after inserted image
+        setTimeout(() => {
+          textarea.focus();
+          const newCursorPos = start + imageMarkdown.length;
+          textarea.setSelectionRange(newCursorPos, newCursorPos);
+        }, 0);
+      } else {
+        // Fallback: append to end
+        setMarkdownContent(prev => prev + `\n\n![${file.name}](${url})\n`);
+      }
+      
+      toast.success('✅ Image inserted!');
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to upload image');
+    } finally {
+      setUploadingImage(false);
+      // Reset file input
+      e.target.value = '';
     }
   };
 
@@ -173,6 +261,82 @@ export default function ArticlePage() {
           />
         </div>
 
+        {/* Featured Image Upload */}
+        <div className="article-card">
+          <div className="article-card-header">
+            <h3 className="article-card-title">🖼️ Featured Image</h3>
+            <p className="article-card-subtitle">Upload a featured image for this article</p>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <label style={{ 
+              display: 'inline-block',
+              padding: '12px 24px',
+              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              color: 'white',
+              borderRadius: '8px',
+              cursor: uploadingImage ? 'not-allowed' : 'pointer',
+              textAlign: 'center',
+              fontWeight: 600,
+              opacity: uploadingImage ? 0.6 : 1,
+              transition: 'all 0.3s ease'
+            }}>
+              {uploadingImage ? '⏳ Uploading...' : '📤 Upload Featured Image'}
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleFeaturedImageUpload}
+                disabled={uploadingImage}
+                style={{ display: 'none' }}
+              />
+            </label>
+            {featuredImage && (
+              <div style={{ 
+                position: 'relative',
+                display: 'inline-block',
+                maxWidth: '100%'
+              }}>
+                <img 
+                  src={featuredImage} 
+                  alt="Featured" 
+                  style={{ 
+                    width: '100%',
+                    maxWidth: '600px',
+                    height: 'auto',
+                    borderRadius: '12px',
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                    border: '2px solid #e2e8f0'
+                  }} 
+                />
+                <button
+                  onClick={() => {
+                    setFeaturedImage('');
+                    toast.success('Featured image removed');
+                  }}
+                  style={{
+                    position: 'absolute',
+                    top: '8px',
+                    right: '8px',
+                    background: 'rgba(239, 68, 68, 0.9)',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '50%',
+                    width: '32px',
+                    height: '32px',
+                    cursor: 'pointer',
+                    fontSize: '18px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.2)'
+                  }}
+                >
+                  ×
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+
         {/* Prompt Input */}
         <div className="article-card">
           <div className="article-card-header">
@@ -208,20 +372,74 @@ export default function ArticlePage() {
         <div className="content-area">
           {activeTab === 'edit' && (
             <div>
-              <h3 className="article-card-title" style={{ marginBottom: '20px' }}>
-                Markdown Content
-              </h3>
+              <div style={{ 
+                display: 'flex', 
+                justifyContent: 'space-between', 
+                alignItems: 'center',
+                marginBottom: '20px' 
+              }}>
+                <h3 className="article-card-title" style={{ margin: 0 }}>
+                  Markdown Content
+                </h3>
+                <label style={{ 
+                  display: 'inline-block',
+                  padding: '10px 20px',
+                  background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                  color: 'white',
+                  borderRadius: '8px',
+                  cursor: uploadingImage ? 'not-allowed' : 'pointer',
+                  textAlign: 'center',
+                  fontWeight: 600,
+                  fontSize: '14px',
+                  opacity: uploadingImage ? 0.6 : 1,
+                  transition: 'all 0.3s ease',
+                  boxShadow: '0 2px 8px rgba(16, 185, 129, 0.3)'
+                }}>
+                  {uploadingImage ? '⏳ Uploading...' : '📷 Insert Image'}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleInsertImage}
+                    disabled={uploadingImage}
+                    style={{ display: 'none' }}
+                  />
+                </label>
+              </div>
               <textarea
+                ref={textareaRef}
                 value={markdownContent}
                 onChange={(e) => setMarkdownContent(e.target.value)}
                 className="form-textarea-modern form-textarea-tall"
-                placeholder="Edit your markdown content here..."
+                placeholder="Edit your markdown content here... Use the 'Insert Image' button to add images."
               />
+              <p style={{ 
+                marginTop: '12px', 
+                fontSize: '13px', 
+                color: '#718096',
+                fontStyle: 'italic'
+              }}>
+                💡 Tip: Click "Insert Image" to upload and automatically insert image markdown syntax at your cursor position
+              </p>
             </div>
           )}
 
           {activeTab === 'preview' && (
             <div className="content-preview">
+              {featuredImage && (
+                <div style={{ marginBottom: '24px' }}>
+                  <img 
+                    src={featuredImage} 
+                    alt="Featured" 
+                    style={{ 
+                      width: '100%',
+                      maxHeight: '400px',
+                      objectFit: 'cover',
+                      borderRadius: '12px',
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+                    }} 
+                  />
+                </div>
+              )}
               <h1>{data.title || 'Untitled Article'}</h1>
               <div className="meta-info-bar">
                 <span className="meta-item">📅 {new Date(data.createdAt).toLocaleDateString()}</span>
@@ -231,7 +449,24 @@ export default function ArticlePage() {
                   </span>
                 )}
               </div>
-              <ReactMarkdown>{markdownContent}</ReactMarkdown>
+              <ReactMarkdown 
+                components={{
+                  img: ({ node, ...props }) => (
+                    <img 
+                      {...props} 
+                      style={{ 
+                        maxWidth: '100%', 
+                        height: 'auto',
+                        borderRadius: '8px',
+                        margin: '16px 0',
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+                      }} 
+                    />
+                  )
+                }}
+              >
+                {markdownContent}
+              </ReactMarkdown>
             </div>
           )}
         </div>
