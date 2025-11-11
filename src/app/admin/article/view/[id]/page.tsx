@@ -149,11 +149,8 @@ export default function ArticleViewPage() {
                 </div>
               )}
 
-              {/* Title */}
-              <h1>{data.title || 'Untitled Article'}</h1>
-
               {/* Meta Info */}
-              <div className="meta-info-bar">
+              <div className="meta-info-bar" style={{ marginBottom: '24px' }}>
                 <span className="meta-item">
                   📅 {new Date(data.createdAt).toLocaleDateString()}
                 </span>
