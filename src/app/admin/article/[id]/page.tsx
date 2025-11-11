@@ -3,6 +3,7 @@ import { useEffect, useState, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import AdminLayout from '@/components/AdminLayout';
 import Loading from '@/components/Loading';
+import ImageGallery from '@/components/ImageGallery';
 import toast, { Toaster } from 'react-hot-toast';
 import ReactMarkdown from 'react-markdown';
 import '@/styles/article.css';
@@ -16,6 +17,7 @@ export default function ArticlePage() {
   const [uploadingImage, setUploadingImage] = useState(false);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'edit' | 'preview' | 'seo'>('edit');
+  const [showGallery, setShowGallery] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
 
@@ -119,39 +121,44 @@ export default function ArticlePage() {
     setUploadingImage(true);
     try {
       const url = await uploadImage(file);
-      
-      // Insert markdown image syntax at cursor position
-      const textarea = textareaRef.current;
-      if (textarea) {
-        const start = textarea.selectionStart;
-        const end = textarea.selectionEnd;
-        const imageMarkdown = `![${file.name}](${url})`;
-        const newContent = 
-          markdownContent.substring(0, start) + 
-          imageMarkdown + 
-          markdownContent.substring(end);
-        
-        setMarkdownContent(newContent);
-        
-        // Set cursor position after inserted image
-        setTimeout(() => {
-          textarea.focus();
-          const newCursorPos = start + imageMarkdown.length;
-          textarea.setSelectionRange(newCursorPos, newCursorPos);
-        }, 0);
-      } else {
-        // Fallback: append to end
-        setMarkdownContent(prev => prev + `\n\n![${file.name}](${url})\n`);
-      }
-      
+      insertImageMarkdown(url, file.name);
       toast.success('✅ Image inserted!');
     } catch (err: any) {
       toast.error(err.message || 'Failed to upload image');
     } finally {
       setUploadingImage(false);
-      // Reset file input
       e.target.value = '';
     }
+  };
+
+  const insertImageMarkdown = (url: string, name: string) => {
+    const textarea = textareaRef.current;
+    if (textarea) {
+      const start = textarea.selectionStart;
+      const end = textarea.selectionEnd;
+      const imageMarkdown = `![${name}](${url})`;
+      const newContent = 
+        markdownContent.substring(0, start) + 
+        imageMarkdown + 
+        markdownContent.substring(end);
+      
+      setMarkdownContent(newContent);
+      
+      // Set cursor position after inserted image
+      setTimeout(() => {
+        textarea.focus();
+        const newCursorPos = start + imageMarkdown.length;
+        textarea.setSelectionRange(newCursorPos, newCursorPos);
+      }, 0);
+    } else {
+      // Fallback: append to end
+      setMarkdownContent(prev => prev + `\n\n![${name}](${url})\n`);
+    }
+  };
+
+  const handleGallerySelect = (url: string, name: string) => {
+    insertImageMarkdown(url, name);
+    toast.success('✅ Image inserted!');
   };
 
   const reject = async () => {
@@ -381,29 +388,56 @@ export default function ArticlePage() {
                 <h3 className="article-card-title" style={{ margin: 0 }}>
                   Markdown Content
                 </h3>
-                <label style={{ 
-                  display: 'inline-block',
-                  padding: '10px 20px',
-                  background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                  color: 'white',
-                  borderRadius: '8px',
-                  cursor: uploadingImage ? 'not-allowed' : 'pointer',
-                  textAlign: 'center',
-                  fontWeight: 600,
-                  fontSize: '14px',
-                  opacity: uploadingImage ? 0.6 : 1,
-                  transition: 'all 0.3s ease',
-                  boxShadow: '0 2px 8px rgba(16, 185, 129, 0.3)'
-                }}>
-                  {uploadingImage ? '⏳ Uploading...' : '📷 Insert Image'}
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleInsertImage}
-                    disabled={uploadingImage}
-                    style={{ display: 'none' }}
-                  />
-                </label>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button
+                    onClick={() => setShowGallery(true)}
+                    style={{ 
+                      padding: '10px 20px',
+                      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '8px',
+                      cursor: 'pointer',
+                      fontWeight: 600,
+                      fontSize: '14px',
+                      transition: 'all 0.3s ease',
+                      boxShadow: '0 2px 8px rgba(102, 126, 234, 0.3)'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.transform = 'translateY(-2px)';
+                      e.currentTarget.style.boxShadow = '0 4px 12px rgba(102, 126, 234, 0.4)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.transform = 'translateY(0)';
+                      e.currentTarget.style.boxShadow = '0 2px 8px rgba(102, 126, 234, 0.3)';
+                    }}
+                  >
+                    🖼️ Gallery
+                  </button>
+                  <label style={{ 
+                    display: 'inline-block',
+                    padding: '10px 20px',
+                    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                    color: 'white',
+                    borderRadius: '8px',
+                    cursor: uploadingImage ? 'not-allowed' : 'pointer',
+                    textAlign: 'center',
+                    fontWeight: 600,
+                    fontSize: '14px',
+                    opacity: uploadingImage ? 0.6 : 1,
+                    transition: 'all 0.3s ease',
+                    boxShadow: '0 2px 8px rgba(16, 185, 129, 0.3)'
+                  }}>
+                    {uploadingImage ? '⏳ Uploading...' : '📤 Upload & Insert'}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleInsertImage}
+                      disabled={uploadingImage}
+                      style={{ display: 'none' }}
+                    />
+                  </label>
+                </div>
               </div>
               <textarea
                 ref={textareaRef}
@@ -418,7 +452,7 @@ export default function ArticlePage() {
                 color: '#718096',
                 fontStyle: 'italic'
               }}>
-                💡 Tip: Click "Insert Image" to upload and automatically insert image markdown syntax at your cursor position
+                💡 Tip: Use "Gallery" to browse uploaded images or "Upload & Insert" to upload a new image
               </p>
             </div>
           )}
@@ -470,6 +504,13 @@ export default function ArticlePage() {
             </div>
           )}
         </div>
+
+        {/* Image Gallery Modal */}
+        <ImageGallery
+          isOpen={showGallery}
+          onClose={() => setShowGallery(false)}
+          onSelect={handleGallerySelect}
+        />
 
         {/* Action Buttons */}
         <div className="article-card">
