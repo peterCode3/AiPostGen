@@ -26,6 +26,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { href: '/admin/dashboard', icon: '🏠', label: 'Dashboard' },
     { href: '/admin/drafts', icon: '📝', label: 'Drafts' },
     { href: '/admin/published', icon: '🚀', label: 'Published' },
+    { href: '/blogs', icon: '📚', label: 'Blogs' },
   ];
 
   const isActive = (href: string) => pathname === href || pathname?.startsWith(href + '/');
