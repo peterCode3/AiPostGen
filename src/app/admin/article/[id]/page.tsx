@@ -86,9 +86,6 @@ export default function ArticlePage() {
 
     const json = await res.json();
     if (!res.ok) {
-      if (json.requiresCloudinary) {
-        throw new Error('⚠️ Cloudinary setup required! Please add Cloudinary credentials to Vercel environment variables. See console for details.');
-      }
       throw new Error(json.error || 'Upload failed');
     }
     return json.url;

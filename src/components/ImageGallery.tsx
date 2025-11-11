@@ -66,18 +66,6 @@ export default function ImageGallery({ isOpen, onClose, onSelect }: ImageGallery
 
       const json = await res.json();
       if (!res.ok) {
-        if (json.requiresCloudinary) {
-          toast.error('⚠️ Cloudinary setup required! Add CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, and CLOUDINARY_API_SECRET to Vercel environment variables.');
-          console.error('Cloudinary Setup Required:', {
-            message: 'Please configure Cloudinary in Vercel environment variables',
-            steps: [
-              '1. Sign up at https://cloudinary.com/users/register/free',
-              '2. Get your Cloud Name, API Key, and API Secret',
-              '3. Add them to Vercel: Settings → Environment Variables',
-              '4. Redeploy your application'
-            ]
-          });
-        }
         throw new Error(json.error || 'Upload failed');
       }
 
