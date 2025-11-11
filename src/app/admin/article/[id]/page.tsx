@@ -503,7 +503,11 @@ export default function ArticlePage() {
                       objectFit: 'cover',
                       borderRadius: '12px',
                       boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
-                    }} 
+                    }}
+                    onError={(e) => {
+                      const target = e.target as HTMLImageElement;
+                      target.style.display = 'none';
+                    }}
                   />
                 </div>
               )}

@@ -249,13 +249,15 @@ export default function BlogPostPage() {
         </div>
 
         <article className="blog-post-content">
-          {blog.featuredImage && (
-            <img
-              src={blog.featuredImage}
-              alt={blog.title}
-              className="blog-post-featured-image"
-            />
-          )}
+          <img
+            src={blog.featuredImage || 'https://via.placeholder.com/1200x500/667eea/ffffff?text=No+Featured+Image'}
+            alt={blog.title}
+            className="blog-post-featured-image"
+            onError={(e) => {
+              const target = e.target as HTMLImageElement;
+              target.src = 'https://via.placeholder.com/1200x500/667eea/ffffff?text=No+Featured+Image';
+            }}
+          />
 
           <h1 className="blog-post-title">{blog.title || 'Untitled'}</h1>
 

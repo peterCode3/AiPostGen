@@ -256,13 +256,15 @@ export default function BlogsPage() {
                 href={`/blogs/${getSlug(blog.title, blog._id)}`}
                 className="blog-card"
               >
-                {blog.featuredImage && (
-                  <img
-                    src={blog.featuredImage}
-                    alt={blog.title}
-                    className="blog-card-image"
-                  />
-                )}
+                <img
+                  src={blog.featuredImage || 'https://via.placeholder.com/600x400/667eea/ffffff?text=No+Image'}
+                  alt={blog.title}
+                  className="blog-card-image"
+                  onError={(e) => {
+                    const target = e.target as HTMLImageElement;
+                    target.src = 'https://via.placeholder.com/600x400/667eea/ffffff?text=No+Image';
+                  }}
+                />
                 <div className="blog-card-content">
                   <div className="blog-card-meta">
                     <span className="blog-card-date">
