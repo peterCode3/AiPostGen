@@ -15,12 +15,10 @@ export default function BlogsPage() {
 
   const fetchBlogs = async () => {
     try {
-      const res = await fetch('/api/articles/draft');
+      const res = await fetch('/api/blogs');
       if (!res.ok) throw new Error('Failed to load blogs');
       const data = await res.json();
-      // Filter only published articles
-      const published = data.filter((article: any) => article.status === 'published');
-      setBlogs(published);
+      setBlogs(data);
     } catch (err) {
       console.error('Error loading blogs:', err);
     } finally {

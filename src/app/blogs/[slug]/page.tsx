@@ -18,8 +18,8 @@ export default function BlogPostPage() {
 
   const fetchBlog = async () => {
     try {
-      // First, get all articles
-      const res = await fetch('/api/articles/draft');
+      // Get all published blogs
+      const res = await fetch('/api/blogs');
       if (!res.ok) throw new Error('Failed to load blog');
       const data = await res.json();
       
@@ -32,7 +32,7 @@ export default function BlogPostPage() {
         return slug === params.slug || article._id === params.slug;
       });
 
-      if (!found || found.status !== 'published') {
+      if (!found) {
         router.push('/blogs');
         return;
       }
