@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
+import { put } from '@vercel/blob';
 
 export async function POST(req: NextRequest) {
   try {
@@ -11,7 +12,39 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'No file uploaded' }, { status: 400 });
     }
 
-    // Use local file system - save to public/uploads directory
+    // Check if we're on Vercel - use Vercel Blob Storage
+    const isVercel = process.env.VERCEL === '1';
+    
+    if (isVercel) {
+      // Use Vercel Blob Storage for production
+      try {
+        const timestamp = Date.now();
+        const randomStr = Math.random().toString(36).substring(2, 15);
+        const sanitizedName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+        const fileName = `uploads/${timestamp}-${randomStr}-${sanitizedName}`;
+
+        const arrayBuffer = await file.arrayBuffer();
+        const buffer = Buffer.from(arrayBuffer);
+
+        const blob = await put(fileName, buffer, {
+          access: 'public',
+          contentType: file.type,
+        });
+
+        return NextResponse.json({ url: blob.url });
+      } catch (blobErr: any) {
+        console.error('[upload] Vercel Blob error:', blobErr);
+        return NextResponse.json(
+          { 
+            error: 'Failed to upload to Vercel Blob Storage. Please ensure BLOB_READ_WRITE_TOKEN is set in Vercel environment variables.',
+            code: 'BLOB_STORAGE_ERROR'
+          },
+          { status: 500 }
+        );
+      }
+    }
+
+    // Use local file system for development
     const uploadsDir = path.join(process.cwd(), 'public', 'uploads');
     
     try {
@@ -19,11 +52,10 @@ export async function POST(req: NextRequest) {
         fs.mkdirSync(uploadsDir, { recursive: true });
       }
     } catch (mkdirErr: any) {
-      // If directory creation fails (e.g., on Vercel), return helpful error
-      if (mkdirErr.code === 'EROFS' || process.env.VERCEL === '1') {
+      if (mkdirErr.code === 'EROFS') {
         return NextResponse.json(
           { 
-            error: 'File system is read-only on this hosting platform. Please use a hosting service that supports file system writes (e.g., Railway, Render, DigitalOcean, AWS EC2) or configure cloud storage.',
+            error: 'File system is read-only. Please use a hosting service that supports file system writes.',
             code: 'READ_ONLY_FILESYSTEM'
           },
           { status: 500 }
@@ -44,11 +76,10 @@ export async function POST(req: NextRequest) {
     try {
       fs.writeFileSync(filePath, buffer);
     } catch (writeErr: any) {
-      // If file write fails (e.g., on Vercel), return helpful error
-      if (writeErr.code === 'EROFS' || process.env.VERCEL === '1') {
+      if (writeErr.code === 'EROFS') {
         return NextResponse.json(
           { 
-            error: 'File system is read-only on this hosting platform. Please use a hosting service that supports file system writes (e.g., Railway, Render, DigitalOcean, AWS EC2) or configure cloud storage.',
+            error: 'File system is read-only. Please use a hosting service that supports file system writes.',
             code: 'READ_ONLY_FILESYSTEM'
           },
           { status: 500 }
@@ -61,11 +92,10 @@ export async function POST(req: NextRequest) {
   } catch (err: any) {
     console.error('[upload] Error:', err);
     
-    // Check for read-only filesystem error
-    if (err.code === 'EROFS' || process.env.VERCEL === '1') {
+    if (err.code === 'EROFS') {
       return NextResponse.json(
         { 
-          error: 'File system is read-only on this hosting platform. Please use a hosting service that supports file system writes (e.g., Railway, Render, DigitalOcean, AWS EC2) or configure cloud storage.',
+          error: 'File system is read-only. Please use a hosting service that supports file system writes.',
           code: 'READ_ONLY_FILESYSTEM'
         },
         { status: 500 }

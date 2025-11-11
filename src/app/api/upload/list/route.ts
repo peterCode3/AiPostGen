@@ -1,10 +1,42 @@
 import { NextRequest, NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
+import { list } from '@vercel/blob';
 
 export async function GET(req: NextRequest) {
   try {
-    // Use local file system - list images from public/uploads directory
+    // Check if we're on Vercel - use Vercel Blob Storage
+    const isVercel = process.env.VERCEL === '1';
+    
+    if (isVercel) {
+      // List images from Vercel Blob Storage
+      try {
+        const { blobs } = await list({
+          prefix: 'uploads/',
+        });
+
+        const images = blobs
+          .filter(blob => {
+            const ext = blob.pathname.split('.').pop()?.toLowerCase();
+            return ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp'].includes(ext || '');
+          })
+          .map(blob => ({
+            name: blob.pathname.split('/').pop() || blob.pathname,
+            url: blob.url,
+            size: blob.size || 0,
+            createdAt: new Date(blob.uploadedAt),
+          }))
+          .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+
+        return NextResponse.json({ images });
+      } catch (blobErr: any) {
+        console.error('[upload:list] Vercel Blob error:', blobErr);
+        // Return empty array if blob storage fails
+        return NextResponse.json({ images: [] });
+      }
+    }
+
+    // Use local file system for development
     const uploadsDir = path.join(process.cwd(), 'public', 'uploads');
     
     if (!fs.existsSync(uploadsDir)) {

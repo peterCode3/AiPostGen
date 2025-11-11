@@ -86,6 +86,9 @@ export default function ArticlePage() {
 
     const json = await res.json();
     if (!res.ok) {
+      if (json.code === 'BLOB_STORAGE_ERROR') {
+        throw new Error('⚠️ Vercel Blob Storage setup required! Please add BLOB_READ_WRITE_TOKEN in Vercel environment variables.');
+      }
       if (json.code === 'READ_ONLY_FILESYSTEM') {
         throw new Error('⚠️ This hosting platform does not support file uploads. Please use Railway, Render, or DigitalOcean for file system writes.');
       }
