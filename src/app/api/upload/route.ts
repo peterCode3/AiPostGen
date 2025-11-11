@@ -13,8 +13,23 @@ export async function POST(req: NextRequest) {
 
     // Use local file system - save to public/uploads directory
     const uploadsDir = path.join(process.cwd(), 'public', 'uploads');
-    if (!fs.existsSync(uploadsDir)) {
-      fs.mkdirSync(uploadsDir, { recursive: true });
+    
+    try {
+      if (!fs.existsSync(uploadsDir)) {
+        fs.mkdirSync(uploadsDir, { recursive: true });
+      }
+    } catch (mkdirErr: any) {
+      // If directory creation fails (e.g., on Vercel), return helpful error
+      if (mkdirErr.code === 'EROFS' || process.env.VERCEL === '1') {
+        return NextResponse.json(
+          { 
+            error: 'File system is read-only on this hosting platform. Please use a hosting service that supports file system writes (e.g., Railway, Render, DigitalOcean, AWS EC2) or configure cloud storage.',
+            code: 'READ_ONLY_FILESYSTEM'
+          },
+          { status: 500 }
+        );
+      }
+      throw mkdirErr;
     }
 
     const timestamp = Date.now();
@@ -25,11 +40,38 @@ export async function POST(req: NextRequest) {
 
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
-    fs.writeFileSync(filePath, buffer);
+    
+    try {
+      fs.writeFileSync(filePath, buffer);
+    } catch (writeErr: any) {
+      // If file write fails (e.g., on Vercel), return helpful error
+      if (writeErr.code === 'EROFS' || process.env.VERCEL === '1') {
+        return NextResponse.json(
+          { 
+            error: 'File system is read-only on this hosting platform. Please use a hosting service that supports file system writes (e.g., Railway, Render, DigitalOcean, AWS EC2) or configure cloud storage.',
+            code: 'READ_ONLY_FILESYSTEM'
+          },
+          { status: 500 }
+        );
+      }
+      throw writeErr;
+    }
 
     return NextResponse.json({ url: `/${fileName}` });
   } catch (err: any) {
     console.error('[upload] Error:', err);
+    
+    // Check for read-only filesystem error
+    if (err.code === 'EROFS' || process.env.VERCEL === '1') {
+      return NextResponse.json(
+        { 
+          error: 'File system is read-only on this hosting platform. Please use a hosting service that supports file system writes (e.g., Railway, Render, DigitalOcean, AWS EC2) or configure cloud storage.',
+          code: 'READ_ONLY_FILESYSTEM'
+        },
+        { status: 500 }
+      );
+    }
+    
     return NextResponse.json({ error: err.message || 'Upload failed' }, { status: 500 });
   }
 }

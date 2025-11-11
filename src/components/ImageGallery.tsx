@@ -66,6 +66,10 @@ export default function ImageGallery({ isOpen, onClose, onSelect }: ImageGallery
 
       const json = await res.json();
       if (!res.ok) {
+        if (json.code === 'READ_ONLY_FILESYSTEM') {
+          toast.error('⚠️ This hosting platform does not support file uploads. Please use Railway, Render, or DigitalOcean for file system writes.');
+          throw new Error(json.error);
+        }
         throw new Error(json.error || 'Upload failed');
       }
 

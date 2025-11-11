@@ -86,6 +86,9 @@ export default function ArticlePage() {
 
     const json = await res.json();
     if (!res.ok) {
+      if (json.code === 'READ_ONLY_FILESYSTEM') {
+        throw new Error('⚠️ This hosting platform does not support file uploads. Please use Railway, Render, or DigitalOcean for file system writes.');
+      }
       throw new Error(json.error || 'Upload failed');
     }
     return json.url;
