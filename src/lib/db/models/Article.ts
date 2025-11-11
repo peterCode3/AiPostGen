@@ -23,6 +23,7 @@ const ArticleSchema = new Schema({
   },
   language: { type: String, default: 'en' },
   canonicalUrl: String,
+  featuredImage: String,
   sourceRefs: [SourceRefSchema],
   outline: [{ h: String, bullets: [String] }],
   content: { html: String, markdown: String },
