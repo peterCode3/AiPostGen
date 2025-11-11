@@ -18,6 +18,7 @@ export default function ArticlePage() {
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'edit' | 'preview' | 'seo'>('edit');
   const [showGallery, setShowGallery] = useState(false);
+  const [showFeaturedGallery, setShowFeaturedGallery] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
 
@@ -156,9 +157,14 @@ export default function ArticlePage() {
     }
   };
 
-  const handleGallerySelect = (url: string, name: string) => {
-    insertImageMarkdown(url, name);
+  const handleGallerySelect = (url: string, name?: string) => {
+    insertImageMarkdown(url, name || 'image');
     toast.success('✅ Image inserted!');
+  };
+
+  const handleFeaturedGallerySelect = (url: string, name?: string) => {
+    setFeaturedImage(url);
+    toast.success('✅ Featured image selected!');
   };
 
   const reject = async () => {
@@ -275,27 +281,54 @@ export default function ArticlePage() {
             <p className="article-card-subtitle">Upload a featured image for this article</p>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <label style={{ 
-              display: 'inline-block',
-              padding: '12px 24px',
-              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-              color: 'white',
-              borderRadius: '8px',
-              cursor: uploadingImage ? 'not-allowed' : 'pointer',
-              textAlign: 'center',
-              fontWeight: 600,
-              opacity: uploadingImage ? 0.6 : 1,
-              transition: 'all 0.3s ease'
-            }}>
-              {uploadingImage ? '⏳ Uploading...' : '📤 Upload Featured Image'}
-              <input
-                type="file"
-                accept="image/*"
-                onChange={handleFeaturedImageUpload}
-                disabled={uploadingImage}
-                style={{ display: 'none' }}
-              />
-            </label>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button
+                onClick={() => setShowFeaturedGallery(true)}
+                style={{ 
+                  padding: '12px 24px',
+                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  fontWeight: 600,
+                  transition: 'all 0.3s ease',
+                  boxShadow: '0 2px 8px rgba(102, 126, 234, 0.3)'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(102, 126, 234, 0.4)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = '0 2px 8px rgba(102, 126, 234, 0.3)';
+                }}
+              >
+                🖼️ Choose from Gallery
+              </button>
+              <label style={{ 
+                display: 'inline-block',
+                padding: '12px 24px',
+                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                color: 'white',
+                borderRadius: '8px',
+                cursor: uploadingImage ? 'not-allowed' : 'pointer',
+                textAlign: 'center',
+                fontWeight: 600,
+                opacity: uploadingImage ? 0.6 : 1,
+                transition: 'all 0.3s ease',
+                boxShadow: '0 2px 8px rgba(16, 185, 129, 0.3)'
+              }}>
+                {uploadingImage ? '⏳ Uploading...' : '📤 Upload New'}
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleFeaturedImageUpload}
+                  disabled={uploadingImage}
+                  style={{ display: 'none' }}
+                />
+              </label>
+            </div>
             {featuredImage && (
               <div style={{ 
                 position: 'relative',
@@ -505,11 +538,18 @@ export default function ArticlePage() {
           )}
         </div>
 
-        {/* Image Gallery Modal */}
+        {/* Image Gallery Modal for Inline Images */}
         <ImageGallery
           isOpen={showGallery}
           onClose={() => setShowGallery(false)}
           onSelect={handleGallerySelect}
+        />
+
+        {/* Image Gallery Modal for Featured Image */}
+        <ImageGallery
+          isOpen={showFeaturedGallery}
+          onClose={() => setShowFeaturedGallery(false)}
+          onSelect={handleFeaturedGallerySelect}
         />
 
         {/* Action Buttons */}

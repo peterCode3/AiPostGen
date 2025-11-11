@@ -132,6 +132,23 @@ export default function ArticleViewPage() {
         {activeTab === 'preview' && (
           <div className="content-area">
             <article className="content-preview">
+              {/* Featured Image */}
+              {data.featuredImage && (
+                <div style={{ marginBottom: '32px' }}>
+                  <img 
+                    src={data.featuredImage} 
+                    alt={data.title || 'Featured'} 
+                    style={{ 
+                      width: '100%',
+                      maxHeight: '500px',
+                      objectFit: 'cover',
+                      borderRadius: '16px',
+                      boxShadow: '0 8px 24px rgba(0,0,0,0.12)'
+                    }} 
+                  />
+                </div>
+              )}
+
               {/* Title */}
               <h1>{data.title || 'Untitled Article'}</h1>
 

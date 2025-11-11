@@ -6,7 +6,7 @@ import toast from 'react-hot-toast';
 interface ImageGalleryProps {
   isOpen: boolean;
   onClose: () => void;
-  onSelect: (url: string, name: string) => void;
+  onSelect: (url: string, name?: string) => void;
 }
 
 interface ImageItem {
