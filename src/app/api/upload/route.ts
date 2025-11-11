@@ -21,12 +21,26 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'No file uploaded' }, { status: 400 });
     }
 
+    // Check if we're in production (Vercel) - file system is read-only
+    const isProduction = process.env.VERCEL === '1' || process.env.NODE_ENV === 'production';
+    
     // Check if Cloudinary is configured (for production/Vercel)
     const useCloudinary = !!(
       process.env.CLOUDINARY_CLOUD_NAME &&
       process.env.CLOUDINARY_API_KEY &&
       process.env.CLOUDINARY_API_SECRET
     );
+
+    // In production, Cloudinary is required
+    if (isProduction && !useCloudinary) {
+      return NextResponse.json(
+        { 
+          error: 'Image upload requires Cloudinary configuration in production. Please add CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, and CLOUDINARY_API_SECRET to your environment variables.',
+          requiresCloudinary: true
+        },
+        { status: 500 }
+      );
+    }
 
     if (useCloudinary) {
       // Use Cloudinary for production
