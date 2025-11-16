@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
-import { put } from '@vercel/blob';
 
 export async function POST(req: NextRequest) {
   try {
@@ -12,39 +11,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'No file uploaded' }, { status: 400 });
     }
 
-    // Check if we're on Vercel - use Vercel Blob Storage
-    const isVercel = process.env.VERCEL === '1';
-    
-    if (isVercel) {
-      // Use Vercel Blob Storage for production
-      try {
-        const timestamp = Date.now();
-        const randomStr = Math.random().toString(36).substring(2, 15);
-        const sanitizedName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
-        const fileName = `uploads/${timestamp}-${randomStr}-${sanitizedName}`;
-
-        const arrayBuffer = await file.arrayBuffer();
-        const buffer = Buffer.from(arrayBuffer);
-
-        const blob = await put(fileName, buffer, {
-          access: 'public',
-          contentType: file.type,
-        });
-
-        return NextResponse.json({ url: blob.url });
-      } catch (blobErr: any) {
-        console.error('[upload] Vercel Blob error:', blobErr);
-        return NextResponse.json(
-          { 
-            error: 'Failed to upload to Vercel Blob Storage. Please ensure BLOB_READ_WRITE_TOKEN is set in Vercel environment variables.',
-            code: 'BLOB_STORAGE_ERROR'
-          },
-          { status: 500 }
-        );
-      }
-    }
-
-    // Use local file system for development
+    // Upload directly to public/uploads directory
     const uploadsDir = path.join(process.cwd(), 'public', 'uploads');
     
     try {
