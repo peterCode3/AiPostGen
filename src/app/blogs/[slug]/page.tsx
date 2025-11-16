@@ -250,12 +250,12 @@ export default function BlogPostPage() {
 
         <article className="blog-post-content">
           <img
-            src={blog.featuredImage || 'https://via.placeholder.com/1200x500/667eea/ffffff?text=No+Featured+Image'}
+            src={blog.featuredImage || '/default-blog-image-large.svg'}
             alt={blog.title}
             className="blog-post-featured-image"
             onError={(e) => {
               const target = e.target as HTMLImageElement;
-              target.src = 'https://via.placeholder.com/1200x500/667eea/ffffff?text=No+Featured+Image';
+              target.src = '/default-blog-image-large.svg';
             }}
           />
 

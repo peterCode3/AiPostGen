@@ -257,12 +257,12 @@ export default function BlogsPage() {
                 className="blog-card"
               >
                 <img
-                  src={blog.featuredImage || 'https://via.placeholder.com/600x400/667eea/ffffff?text=No+Image'}
+                  src={blog.featuredImage || '/default-blog-image.svg'}
                   alt={blog.title}
                   className="blog-card-image"
                   onError={(e) => {
                     const target = e.target as HTMLImageElement;
-                    target.src = 'https://via.placeholder.com/600x400/667eea/ffffff?text=No+Image';
+                    target.src = '/default-blog-image.svg';
                   }}
                 />
                 <div className="blog-card-content">
