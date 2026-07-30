@@ -1,0 +1,15 @@
+.git
+.gitignore
+.next
+node_modules
+npm-debug.log
+.env
+.env.local
+.env.*.local
+README.md
+INTEGRATION.md
+VERCEL_BLOB_SETUP.md
+.vscode
+.idea
+.DS_Store
+public/uploads

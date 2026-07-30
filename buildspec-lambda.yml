@@ -1,0 +1,27 @@
+version: 0.2
+
+# CodeBuild project: builds the AiPostGen worker Lambda image and pushes to ECR.
+# Use compute type BUILD_GENERAL1_SMALL with image aws/codebuild/standard:7.0 (Docker pre-installed).
+
+phases:
+  pre_build:
+    commands:
+      - echo "logging in to ECR"
+      - aws ecr get-login-password --region eu-central-1 | docker login --username AWS --password-stdin 637423621249.dkr.ecr.eu-central-1.amazonaws.com
+      - echo "installing node deps"
+      - npm ci --no-audit --no-fund
+
+  build:
+    commands:
+      - echo "bundling lambda handler with esbuild"
+      - npm run build:lambda
+      - ls -lh dist/handler.cjs
+      - echo "building lambda image"
+      - docker build --platform linux/amd64 -f Dockerfile.lambda -t aipostgen-worker:latest .
+      - docker tag aipostgen-worker:latest 637423621249.dkr.ecr.eu-central-1.amazonaws.com/aipostgen-worker:latest
+
+  post_build:
+    commands:
+      - echo "pushing image"
+      - docker push 637423621249.dkr.ecr.eu-central-1.amazonaws.com/aipostgen-worker:latest
+      - echo "image push complete"

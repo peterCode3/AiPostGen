@@ -1,35 +1,28 @@
-import { NextRequest, NextResponse } from 'next/server';
-import fs from 'fs';
-import path from 'path';
+import { NextResponse } from 'next/server';
+import { BUCKET, listObjects, publicUrl } from '@/lib/storage/gcs';
 
-export async function GET(req: NextRequest) {
+const IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg', '.bmp'];
+
+export async function GET() {
+  if (!BUCKET) {
+    return NextResponse.json({ error: 'GCS_UPLOAD_BUCKET not configured' }, { status: 500 });
+  }
+
   try {
-    // List images from public/uploads directory
-    const uploadsDir = path.join(process.cwd(), 'public', 'uploads');
-    
-    if (!fs.existsSync(uploadsDir)) {
-      return NextResponse.json({ images: [] });
-    }
+    const objects = await listObjects('uploads/', 1000);
 
-    const files = fs.readdirSync(uploadsDir);
-    
-    const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg', '.bmp'];
-    const images = files
-      .filter(file => {
-        const ext = path.extname(file).toLowerCase();
-        return imageExtensions.includes(ext);
+    const images = objects
+      .filter((obj) => {
+        const lower = obj.key.toLowerCase();
+        return IMAGE_EXTENSIONS.some((ext) => lower.endsWith(ext));
       })
-      .map(file => {
-        const filePath = path.join(uploadsDir, file);
-        const stats = fs.statSync(filePath);
-        return {
-          name: file,
-          url: `/uploads/${file}`,
-          size: stats.size,
-          createdAt: stats.birthtime
-        };
-      })
-      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+      .map((obj) => ({
+        name: obj.key.split('/').pop() || obj.key,
+        url: publicUrl(obj.key),
+        size: obj.size,
+        createdAt: obj.createdAt,
+      }))
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
     return NextResponse.json({ images });
   } catch (err: any) {
@@ -37,4 +30,3 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: err.message || 'Failed to list images' }, { status: 500 });
   }
 }
-

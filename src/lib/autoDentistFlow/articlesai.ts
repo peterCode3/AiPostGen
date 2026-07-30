@@ -3,12 +3,25 @@ import { dbConnect } from '../db/connect';
 import Source from '../db/models/Source';
 import Keyword from '../db/models/Keyword';
 import { qGenerate } from '../queue';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import Anthropic from '@anthropic-ai/sdk';
 import got from 'got';
 import * as cheerio from 'cheerio';
 
-const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY || '');
-console.log('✅ Google Gemini API Key:', process.env.GOOGLE_API_KEY ? 'Loaded' : 'Missing');
+const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY || '' });
+const ANTHROPIC_MODEL = process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-6';
+console.log('Anthropic API Key:', process.env.ANTHROPIC_API_KEY ? 'Loaded' : 'Missing');
+
+async function claudeText(prompt: string, maxTokens = 512): Promise<string> {
+  const res = await anthropic.messages.create({
+    model: ANTHROPIC_MODEL,
+    max_tokens: maxTokens,
+    messages: [{ role: 'user', content: prompt }],
+  });
+  return res.content
+    .filter((b): b is Anthropic.TextBlock => b.type === 'text')
+    .map((b) => b.text)
+    .join('\n');
+}
 async function findTopDentistBlogs() {
   console.log('🔍 Finding top dentist blogs...');
   
@@ -95,30 +108,72 @@ async function scrapeAndSave(urls: string[]) {
   return results;
 }
 
+// Defensive parser: takes Claude's response (which sometimes includes markdown
+// tables, numbering, or **bold** markers) and returns clean 3–8 word keyword
+// phrases — one per line, max 10.
+function parseKeywords(raw: string, max = 10): string[] {
+  const out: string[] = [];
+  for (const lineRaw of raw.split('\n')) {
+    let line = lineRaw.trim();
+    if (!line) continue;
+    // Skip markdown headings, table separators, decorative dividers
+    if (/^[#>|`*\-=_~]/.test(line) && !/^\*\*/.test(line)) continue;
+    // Strip leading numbering like "1.", "1)", "- ", "* "
+    line = line.replace(/^\d+[\.\)]\s*/, '').replace(/^[-*•]\s*/, '');
+    // Pull out **bold** content if present (Claude often emphasizes the keyword)
+    const bold = line.match(/\*\*([^*]{3,80})\*\*/);
+    if (bold) line = bold[1];
+    // Strip remaining markdown markers
+    line = line
+      .replace(/\*\*([^*]+)\*\*/g, '$1')
+      .replace(/\*([^*]+)\*/g, '$1')
+      .replace(/`([^`]+)`/g, '$1')
+      .replace(/^["'`]+|["'`]+$/g, '')
+      .trim();
+    // Reject empty, too long, table headers, or lines containing pipes/colons
+    if (!line || line.length > 80 || line.length < 5) continue;
+    if (/^(keyword|original|natural|search intent|seo|category)/i.test(line)) continue;
+    if (line.includes('|')) continue;
+    // Reject lines that look like sentences (multiple commas, end punctuation)
+    if (/[.!?]$/.test(line)) continue;
+    if ((line.match(/,/g) || []).length > 2) continue;
+    out.push(line);
+    if (out.length >= max) break;
+  }
+  return out;
+}
+
 async function extractKeywords(text: string) {
-  const prompt = `Extract 10 high-value SEO keywords related to dentistry, AI, and healthcare:\n\n${text.slice(0, 4000)}`;
-  
-  const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
-  const result = await model.generateContent({
-    contents: [{ role: 'user', parts: [{ text: prompt }] }],
-    generationConfig: { maxOutputTokens: 500, temperature: 0.7 },
-  });
-  
-  const raw = result.response.text();
-  return raw.split('\n').map((k: string) => k.replace(/^\d+[\.\)]?\s*/, '').trim()).filter(Boolean);
+  const prompt = `Extract exactly 10 high-value SEO keywords related to dentistry, AI, and healthcare from the source text below.
+
+STRICT OUTPUT FORMAT:
+- Output ONLY the 10 keyword phrases, one per line.
+- 3–8 words each.
+- NO numbering, NO bullets, NO markdown, NO bold, NO quotes, NO explanations, NO headings, NO tables.
+- NO leading or trailing punctuation.
+
+Source:
+${text.slice(0, 4000)}`;
+  const raw = await claudeText(prompt, 600);
+  return parseKeywords(raw);
 }
 
 async function rephraseKeywords(keywords: string[]) {
-  const prompt = `Rephrase these keywords naturally for SEO without changing meaning:\n${keywords.join(', ')}`;
-  
-  const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
-  const result = await model.generateContent({
-    contents: [{ role: 'user', parts: [{ text: prompt }] }],
-    generationConfig: { maxOutputTokens: 500, temperature: 0.7 },
-  });
-  
-  const raw = result.response.text();
-  return raw.split(',').map((k: string) => k.trim()).filter(Boolean);
+  if (keywords.length === 0) return [];
+  const prompt = `Rephrase each of the following SEO keywords naturally without changing meaning. Keep them concise.
+
+STRICT OUTPUT FORMAT:
+- Output exactly ${keywords.length} lines, one rephrased keyword per line.
+- 3–8 words each.
+- NO numbering, NO bullets, NO markdown, NO bold, NO quotes, NO explanations, NO headings, NO tables, NO commentary.
+
+Input keywords (one per line):
+${keywords.join('\n')}`;
+  const raw = await claudeText(prompt, 600);
+  const parsed = parseKeywords(raw, keywords.length);
+  // Fallback: if parsing collapsed to nothing, return originals so the flow
+  // still produces articles instead of going silent.
+  return parsed.length > 0 ? parsed : keywords;
 }
 
 export async function runAutoDentistFlow() {
@@ -140,26 +195,36 @@ export async function runAutoDentistFlow() {
 
   console.log('✨ Rephrased keywords:', rephrased);
 
-  const serializedResults: { title?: string; url?: string; status: string }[] = [];
+  // Limit how many articles we generate per run; configurable via env, defaults
+  // to 3 keywords × N languages so the schedule doesn't flood DocDB.
+  const dailyKeywords = Number(process.env.AUTO_DENTIST_DAILY_KEYWORDS || 3);
+  const languagesEnv = (process.env.AUTO_DENTIST_LANGUAGES || 'en,ar')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean) as Array<'en' | 'ar'>;
 
-  for (const term of rephrased) {
+  const selectedKeywords = rephrased.slice(0, dailyKeywords);
+  const serializedResults: { title?: string; url?: string; status: string; language?: string }[] = [];
+
+  for (const term of selectedKeywords) {
     const kw = await Keyword.findOneAndUpdate(
       { term },
       { term, used: false },
       { upsert: true, new: true }
     );
 
-    await qGenerate.add('generate', {
-      keywordId: String(kw._id),
-      sourceIds: [],
-      language: 'en'
-    });
+    for (const lang of languagesEnv) {
+      await qGenerate.add('generate', {
+        keywordId: String(kw._id),
+        sourceIds: [],
+        language: lang,
+      });
+      serializedResults.push({ title: kw.term, status: 'queued', language: lang });
+    }
 
     kw.used = true;
     kw.usedAt = new Date();
     await kw.save();
-
-    serializedResults.push({ title: kw.term, status: 'queued' });
   }
 
   scraped.forEach(s => {
@@ -170,8 +235,18 @@ export async function runAutoDentistFlow() {
   return serializedResults;
 }
 
-// Optional CLI support
-if (require.main === module) {
+// Optional CLI support.
+//
+// ⚠ `require.main === module` alone is NOT safe here. When this module is pulled
+// into a single-file esbuild bundle that is then run directly (`node worker.cjs`),
+// the guard evaluates true and the whole auto-dentist flow fires at process
+// startup — burning Serper quota and Anthropic tokens, and enqueueing generate
+// jobs that wake the worker again in a self-feeding loop. Observed for real on
+// Cloud Run 2026-07-29.
+//
+// The explicit env opt-in makes the CLI path impossible to trigger by accident,
+// regardless of how the module is bundled or invoked.
+if (require.main === module && process.env.RUN_AUTO_DENTIST_CLI === '1') {
   runAutoDentistFlow()
     .then(() => process.exit(0))
     .catch(err => {

@@ -3,12 +3,25 @@ import { dbConnect } from '../src/lib/db/connect';
 import Source from '../src/lib/db/models/Source';
 import Keyword from '../src/lib/db/models/Keyword';
 import { qScrape, qGenerate } from '../src/lib/queue';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import Anthropic from '@anthropic-ai/sdk';
 import got from 'got';
 import * as cheerio from 'cheerio';
 
-const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY || '');
-console.log('✅ Google Gemini API Key:', process.env.GOOGLE_API_KEY ? 'Loaded' : 'Missing');
+const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY || '' });
+const ANTHROPIC_MODEL = process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-6';
+console.log('Anthropic API Key:', process.env.ANTHROPIC_API_KEY ? 'Loaded' : 'Missing');
+
+async function claudeText(prompt: string, maxTokens = 1024): Promise<string> {
+  const res = await anthropic.messages.create({
+    model: ANTHROPIC_MODEL,
+    max_tokens: maxTokens,
+    messages: [{ role: 'user', content: prompt }],
+  });
+  return res.content
+    .filter((b): b is Anthropic.TextBlock => b.type === 'text')
+    .map((b) => b.text)
+    .join('\n');
+}
 async function findTopDentistBlogs() {
   console.log('🔍 Finding top dentist blogs...');
   
@@ -101,11 +114,8 @@ Return ONLY the keywords, one per line, without numbering, without explanations,
 
 Text:
 ${text.slice(0, 4000)}`;
-  
-  const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
-  const result = await model.generateContent(prompt);
-  
-  const raw = result.response.text();
+
+  const raw = await claudeText(prompt, 512);
   return raw.split('\n')
     .map((k: string) => k.replace(/^\d+[\.\)\-\*]\s*/, '').replace(/^[\*\-]\s*/, '').trim())
     .filter(k => k.length > 0 && !k.startsWith('**'))
@@ -118,11 +128,8 @@ Return ONLY the rephrased keywords, one per line, without numbering, without exp
 
 Keywords:
 ${keywords.join('\n')}`;
-  
-  const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
-  const result = await model.generateContent(prompt);
-  
-  const raw = result.response.text();
+
+  const raw = await claudeText(prompt, 512);
   return raw.split('\n')
     .map((k: string) => k.replace(/^\d+[\.\)\-\*]\s*/, '').replace(/^[\*\-]\s*/, '').trim())
     .filter(k => k.length > 0 && !k.startsWith('**'))
@@ -174,7 +181,10 @@ export async function runAutoDentistFlow() {
   return results;
 }
 
-if (require.main === module) {
+// See the matching guard in src/lib/autoDentistFlow/articlesai.ts — bare
+// `require.main === module` fires when this module ends up inside a bundle that
+// is executed directly, so the CLI path requires an explicit env opt-in.
+if (require.main === module && process.env.RUN_AUTO_DENTIST_CLI === '1') {
   runAutoDentistFlow()
     .then(() => process.exit(0))
     .catch(err => {

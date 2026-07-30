@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
     const articles = await Article.find({ status: 'published' })
       .sort({ publishedAt: -1, createdAt: -1 })
       .lean()
-      .select('title content metaTitle metaDescription featuredImage createdAt publishedAt language slug _id');
+      .select('title content metaTitle metaDescription featuredImage createdAt publishedAt language slug _id keywords seo');
 
     return NextResponse.json(articles);
   } catch (error: any) {

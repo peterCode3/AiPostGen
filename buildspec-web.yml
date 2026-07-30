@@ -1,0 +1,15 @@
+version: 0.2
+
+phases:
+  pre_build:
+    commands:
+      - aws ecr get-login-password --region eu-central-1 | docker login --username AWS --password-stdin 637423621249.dkr.ecr.eu-central-1.amazonaws.com
+
+  build:
+    commands:
+      - docker build --platform linux/amd64 -f Dockerfile -t aipostgen:latest .
+      - docker tag aipostgen:latest 637423621249.dkr.ecr.eu-central-1.amazonaws.com/aipostgen:latest
+
+  post_build:
+    commands:
+      - docker push 637423621249.dkr.ecr.eu-central-1.amazonaws.com/aipostgen:latest

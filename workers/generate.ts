@@ -203,6 +203,7 @@ import { generateMarkdown } from '../src/lib/llm/provider';
 import { postProcessHTML } from '../src/lib/seo/postprocess';
 import { makeSlug } from '../src/lib/utils/slug';
 import { estimateCost } from '../src/lib/utils/cost';
+import { findAndStoreCover } from '../src/lib/images/cover';
 
 export interface GenerateOptions {
   keywordId: string;
@@ -309,12 +310,14 @@ export async function runGenerate(options: GenerateOptions): Promise<GenerateRes
     const { html, meta } = await postProcessHTML(markdown, { keyword: kw.term });
     console.log('[generate] ✅ Post-processing complete');
 
-    // 6. Generate unique slug
+    // 6. Generate unique slug — scoped per-language so EN and AR translations
+    // of the same keyword share the same slug. The web app uses the slug to
+    // switch locales on a single article URL.
     let baseSlug = makeSlug(kw.term);
     let slug = baseSlug;
     let counter = 1;
 
-    while (await Article.exists({ slug })) {
+    while (await Article.exists({ slug, language })) {
       slug = `${baseSlug}-${counter++}`;
     }
     console.log(`[generate] 🔗 Slug: ${slug}`);
@@ -323,8 +326,25 @@ export async function runGenerate(options: GenerateOptions): Promise<GenerateRes
     const cost = estimateCost(usage || { total_tokens: 0 });
     console.log(`[generate] 💰 Estimated cost: $${cost.totalUSD.toFixed(4)}`);
 
-    // 8. Save article to database
-    console.log('[generate] 💾 Saving to database...');
+    // 8. Find a cover image (Unsplash → S3). Best-effort; on any failure we
+    // proceed without a cover and the card falls back to its gradient.
+    // Pass already-used Unsplash photo IDs so each article gets a distinct image.
+    console.log('[generate] 🖼  Searching for cover image...');
+    const usedIds = new Set<string>();
+    const existingArticles = await Article.find({ featuredImage: { $regex: '/covers/' } })
+      .select('featuredImage')
+      .lean();
+    for (const a of existingArticles) {
+      const m = (a.featuredImage || '').match(/-([A-Za-z0-9_-]{11})\.jpg$/);
+      if (m) usedIds.add(m[1]);
+    }
+    const cover = await findAndStoreCover(kw.term, slug, usedIds);
+    if (cover) console.log(`[generate] 🖼  Cover saved: ${cover.url}`);
+
+    // 9. Save article to database
+    const autoPublish = process.env.AUTO_PUBLISH === 'true';
+    const status = autoPublish ? 'published' : 'review';
+    console.log(`[generate] 💾 Saving to database (status=${status})...`);
     const article = await Article.create({
       slug,
       title: meta.title,
@@ -335,11 +355,13 @@ export async function runGenerate(options: GenerateOptions): Promise<GenerateRes
       prompt,
       outline: meta.outline || [],
       content: { markdown, html },
-      seo: meta.seo || {},
+      seo: { ...(meta.seo || {}), ...(cover ? { coverAttribution: cover.attribution, coverAlt: cover.alt } : {}) },
+      featuredImage: cover?.url,
       canonicalUrl: `/articles/${slug}`,
       language,
       sourceRefs: srcSnips.map((s) => ({ url: s.url, title: s.title })),
-      status: 'review',
+      status,
+      ...(autoPublish ? { publishedAt: new Date() } : {}),
       cost: {
         ...cost,
         provider,

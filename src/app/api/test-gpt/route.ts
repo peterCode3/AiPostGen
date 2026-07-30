@@ -1,115 +1,46 @@
-import { NextRequest, NextResponse } from "next/server";
-import Groq from "groq-sdk";
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { NextResponse } from 'next/server';
+import Anthropic from '@anthropic-ai/sdk';
 
-export async function GET(req: NextRequest) {
-  const results: any = {
-    timestamp: new Date().toISOString(),
-    tests: {}
-  };
+export async function GET() {
+  const results: any = { timestamp: new Date().toISOString(), tests: {} };
 
-  // Test 1: Check if API keys are configured
-  console.log('\n🔍 Testing API Configuration...\n');
-  
-  const groqKey = process.env.GROQ_API_KEY;
-  const googleKey = process.env.GOOGLE_API_KEY;
-  
-  console.log('Google Gemini API Key:', googleKey ? 'Loaded' : 'Missing');
-  console.log('Groq API Key:', groqKey ? 'Loaded' : 'Missing');
-  
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const model = process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-6';
+
   results.tests.apiKeys = {
-    google: googleKey ? '✅ Configured' : '❌ Missing',
-    groq: groqKey ? '✅ Configured' : '❌ Missing'
+    anthropic: apiKey ? 'configured' : 'missing',
   };
 
-  // Test 2: Try Groq
-  if (groqKey) {
-    try {
-      console.log('🤖 Testing Groq API...');
-      const groq = new Groq({ apiKey: groqKey });
-      
-      const response = await groq.chat.completions.create({
-        model: "llama-3.3-70b-versatile",
-        messages: [
-          { role: "system", content: "You are a helpful assistant." },
-          { role: "user", content: "Say 'Groq API is working!' in one sentence." }
-        ],
-        max_tokens: 50,
-        temperature: 0.7,
-      });
-
-      const message = response.choices[0].message?.content;
-      results.tests.groq = {
-        status: '✅ Success',
-        model: 'llama-3.3-70b-versatile',
-        message,
-        usage: response.usage
-      };
-      console.log('✅ Groq test passed!');
-    } catch (err: any) {
-      results.tests.groq = {
-        status: '❌ Failed',
-        error: err.message,
-        code: err.code || err.status
-      };
-      console.error('❌ Groq test failed:', err.message);
-    }
+  if (!apiKey) {
+    results.summary = { overall: 'Anthropic API key missing' };
+    return NextResponse.json(results, { status: 500 });
   }
 
-  // Test 3: Try Google Gemini (Primary)
-  if (googleKey) {
-    try {
-      console.log('🤖 Testing Google Gemini API...');
-      const genAI = new GoogleGenerativeAI(googleKey);
-          const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
-      
-      const result = await model.generateContent({
-        contents: [{ role: "user", parts: [{ text: "Say 'Google Gemini API is working!' in one sentence." }] }],
-        generationConfig: {
-          maxOutputTokens: 50,
-          temperature: 0.7,
-        },
-      });
+  try {
+    const anthropic = new Anthropic({ apiKey });
+    const res = await anthropic.messages.create({
+      model,
+      max_tokens: 50,
+      messages: [
+        { role: 'user', content: "Reply with the single sentence: 'Claude is reachable.'" },
+      ],
+    });
+    const message = res.content
+      .filter((b): b is Anthropic.TextBlock => b.type === 'text')
+      .map((b) => b.text)
+      .join('\n');
 
-      const message = result.response.text();
-      results.tests.google = {
-        status: '✅ Success',
-            model: 'gemini-2.5-flash',
-        message,
-        note: '🎉 FREE & High Quality!'
-      };
-      console.log('✅ Google Gemini test passed!');
-    } catch (err: any) {
-      results.tests.google = {
-        status: '❌ Failed',
-        error: err.message,
-        code: err.code || err.status
-      };
-      console.error('❌ Google Gemini test failed:', err.message);
-    }
+    results.tests.anthropic = {
+      status: 'success',
+      model,
+      message,
+      usage: res.usage,
+    };
+    results.summary = { overall: 'Anthropic provider working', provider: `Claude ${model}` };
+    return NextResponse.json(results, { status: 200 });
+  } catch (err: any) {
+    results.tests.anthropic = { status: 'failed', error: err.message };
+    results.summary = { overall: 'Anthropic provider failed' };
+    return NextResponse.json(results, { status: 500 });
   }
-
-  // Summary
-  const hasGroq = results.tests.groq?.status === '✅ Success';
-  const hasGoogle = results.tests.google?.status === '✅ Success';
-  
-  results.summary = {
-    overall: (hasGroq || hasGoogle) ? '✅ At least one provider working' : '❌ No providers working',
-    recommendation: hasGoogle
-      ? '🎉 Google Gemini is working - FREE & High Quality!'
-      : hasGroq 
-        ? '✅ Groq is working - FREE & Fast!'
-        : '❌ Configure at least one API key',
-    cost: hasGoogle || hasGroq ? 'FREE' : 'N/A',
-    providers: {
-      primary: hasGoogle ? 'Google Gemini ✅' : 'Not configured',
-      fallback: hasGroq ? 'Groq ✅' : 'Not configured'
-    }
-  };
-
-  console.log('\n📊 Test Summary:', results.summary.overall);
-  
-  return NextResponse.json(results, { 
-    status: (hasGroq || hasGoogle) ? 200 : 500 
-  });
 }

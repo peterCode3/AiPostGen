@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireRole } from '@/lib/auth/rbac';
-import { qScrape } from '@/lib/queue';
 import Source from '@/lib/db/models/Source';
 import { dbConnect } from '@/lib/db/connect';
 
