@@ -15,6 +15,10 @@ on:
   # to production by accident.
   push:
     branches: [main]
+    # A documentation-only commit does not need two image rebuilds.
+    paths-ignore:
+      - 'README.md'
+      - 'DEPLOYMENT.md'
   workflow_dispatch:
     inputs:
       target:
