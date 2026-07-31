@@ -81,8 +81,10 @@ async function main() {
     timezone: 'Z',
     connectionLimit: 4,
     // rawHtml/text fields reach ~1 MB; keep headroom for a single-row insert.
+    // mysql2 honours maxAllowedPacket at runtime but omits it from PoolOptions,
+    // so the assertion is required for `tsc --noEmit` in the image build.
     maxAllowedPacket: 64 * 1024 * 1024,
-  });
+  } as mysql.PoolOptions);
 
   const articles = load('articles.json');
   const sources = load('sources.json');

@@ -112,23 +112,33 @@ jobs:
 
       - uses: google-github-actions/setup-gcloud@v2
 
+      # `gcloud builds submit` can exit 0 on a failed build, so the real status
+      # is asserted separately. It must be asserted for THIS build id: the web
+      # and worker jobs run concurrently, so `gcloud builds list --limit=1`
+      # returns whichever build is newest in the project — often the other job's.
       - name: Build image on Cloud Build
         run: |
           set -euo pipefail
-          gcloud builds submit . \
+          BUILD_ID=$(gcloud builds submit . \
             --config=cloudbuild.cloudrun.yaml \
             --region="$REGION" --project="$PROJECT_ID" \
-            --substitutions="_IMAGE=${AR_REPO}/aipostgen-web,_TAG=${IMAGE_TAG}"
-
-      # `gcloud builds submit` can exit 0 on a failed build, so assert the real
-      # status from an independent query rather than trusting the exit code.
-      - name: Verify build succeeded
-        run: |
-          set -euo pipefail
-          STATUS=$(gcloud builds list --region="$REGION" --project="$PROJECT_ID" \
-            --limit=1 --format='value(status)')
-          echo "build status: $STATUS"
-          [ "$STATUS" = "SUCCESS" ] || { echo "::error::build status $STATUS"; exit 1; }
+            --substitutions="_IMAGE=${AR_REPO}/aipostgen-web,_TAG=${IMAGE_TAG}" \
+            --async --format='value(id)')
+          echo "build id: $BUILD_ID"
+          for _ in $(seq 1 240); do                       # 240 x 15s = 60 min
+            STATUS=$(gcloud builds describe "$BUILD_ID" --region="$REGION" \
+              --project="$PROJECT_ID" --format='value(status)')
+            case "$STATUS" in
+              SUCCESS) echo "build $BUILD_ID SUCCESS"; exit 0 ;;
+              FAILURE|INTERNAL_ERROR|TIMEOUT|CANCELLED|EXPIRED)
+                echo "::error::build $BUILD_ID finished as $STATUS"
+                gcloud builds log "$BUILD_ID" --region="$REGION" \
+                  --project="$PROJECT_ID" 2>/dev/null | tail -60
+                exit 1 ;;
+            esac
+            sleep 15
+          done
+          echo "::error::timed out waiting for build $BUILD_ID"; exit 1
 
       - name: Deploy to Cloud Run
         run: |
@@ -166,21 +176,30 @@ jobs:
 
       - uses: google-github-actions/setup-gcloud@v2
 
+      # Polls this build id specifically — see the note in deploy-web.
       - name: Build image on Cloud Build
         run: |
           set -euo pipefail
-          gcloud builds submit . \
+          BUILD_ID=$(gcloud builds submit . \
             --config=cloudbuild.worker.yaml \
             --region="$REGION" --project="$PROJECT_ID" \
-            --substitutions="_IMAGE=${AR_REPO}/aipostgen-worker,_TAG=${IMAGE_TAG}"
-
-      - name: Verify build succeeded
-        run: |
-          set -euo pipefail
-          STATUS=$(gcloud builds list --region="$REGION" --project="$PROJECT_ID" \
-            --limit=1 --format='value(status)')
-          echo "build status: $STATUS"
-          [ "$STATUS" = "SUCCESS" ] || { echo "::error::build status $STATUS"; exit 1; }
+            --substitutions="_IMAGE=${AR_REPO}/aipostgen-worker,_TAG=${IMAGE_TAG}" \
+            --async --format='value(id)')
+          echo "build id: $BUILD_ID"
+          for _ in $(seq 1 240); do                       # 240 x 15s = 60 min
+            STATUS=$(gcloud builds describe "$BUILD_ID" --region="$REGION" \
+              --project="$PROJECT_ID" --format='value(status)')
+            case "$STATUS" in
+              SUCCESS) echo "build $BUILD_ID SUCCESS"; exit 0 ;;
+              FAILURE|INTERNAL_ERROR|TIMEOUT|CANCELLED|EXPIRED)
+                echo "::error::build $BUILD_ID finished as $STATUS"
+                gcloud builds log "$BUILD_ID" --region="$REGION" \
+                  --project="$PROJECT_ID" 2>/dev/null | tail -60
+                exit 1 ;;
+            esac
+            sleep 15
+          done
+          echo "::error::timed out waiting for build $BUILD_ID"; exit 1
 
       - name: Deploy to Cloud Run
         run: |
