@@ -51,6 +51,45 @@ export async function putObject(
   return publicUrl(key);
 }
 
+export interface FetchedObject {
+  body: ReadableStream<Uint8Array>;
+  contentType?: string;
+  size?: number;
+}
+
+/**
+ * Read an object out of the private bucket for serving through the app.
+ * Returns null when the object does not exist, so the caller can 404 rather
+ * than surfacing a storage error.
+ */
+export async function getObjectStream(key: string): Promise<FetchedObject | null> {
+  if (!BUCKET) throw new Error('GCS_UPLOAD_BUCKET not set');
+  const file = client().bucket(BUCKET).file(key);
+
+  const [exists] = await file.exists();
+  if (!exists) return null;
+
+  const [metadata] = await file.getMetadata();
+  // Node stream -> web stream: the Next.js Response body needs the web type.
+  const nodeStream = file.createReadStream();
+  const body = new ReadableStream<Uint8Array>({
+    start(controller) {
+      nodeStream.on('data', (chunk) => controller.enqueue(new Uint8Array(chunk)));
+      nodeStream.on('end', () => controller.close());
+      nodeStream.on('error', (err) => controller.error(err));
+    },
+    cancel() {
+      nodeStream.destroy();
+    },
+  });
+
+  return {
+    body,
+    contentType: metadata?.contentType,
+    size: metadata?.size ? Number(metadata.size) : undefined,
+  };
+}
+
 export interface StoredObject {
   key: string;
   size: number;
