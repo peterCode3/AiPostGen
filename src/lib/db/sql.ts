@@ -120,15 +120,39 @@ function buildPool(): mysql.Pool {
   return pool;
 }
 
-/** Drop-in for the old Mongoose `dbConnect()`; validates the pool is usable. */
+/**
+ * Drop-in for the old Mongoose `dbConnect()`; validates the pool is usable.
+ *
+ * Every API route calls this before touching a model, so it is the first thing
+ * to meet a dead connection after a Cloud SQL restart or failover — and it runs
+ * `SELECT 1` on a *connection*, which the pool-level retry wrapper never sees.
+ * That is exactly how GET /api/blogs/<slug> still returned 500 with
+ * `PROTOCOL_CONNECTION_LOST` after the pool wrapper was in place.
+ *
+ * A dead connection cannot be revived, so each attempt acquires a fresh one and
+ * destroys the broken one rather than returning it to the pool.
+ */
 export async function dbConnect() {
   const p = getPool();
-  const conn = await p.getConnection();
-  try {
-    await conn.query('SELECT 1');
-  } finally {
-    conn.release();
-  }
+
+  const attempt = async () => {
+    const conn = await p.getConnection();
+    try {
+      await conn.query('SELECT 1');
+      conn.release();
+    } catch (err) {
+      // destroy(), not release(): a fatal connection must leave the pool, or it
+      // gets handed straight back to the next caller.
+      try {
+        conn.destroy();
+      } catch {
+        /* already gone */
+      }
+      throw err;
+    }
+  };
+
+  await withRetry(attempt, 'dbConnect');
   return p;
 }
 
