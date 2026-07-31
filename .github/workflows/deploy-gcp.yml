@@ -1,0 +1,198 @@
+name: Deploy to GCP (Cloud Run)
+
+# Builds and deploys the two AiPostGen services to Cloud Run:
+#   aipostgen-web    - Next.js app + admin UI + blog API
+#   aipostgen-worker - Pub/Sub push consumer (generate / scrape / auto-dentist)
+#
+# Authentication is Workload Identity Federation. There are NO GCP credentials
+# in this repository: GitHub mints a short-lived OIDC token per run, GCP
+# verifies GitHub's signature and an attribute condition pinned to this repo's
+# immutable numeric ID, then issues a ~1h access token. Nothing to leak, nothing
+# to rotate.
+
+on:
+  # Push to main deploys DEV. Prod is dispatch-only so a merge can never deploy
+  # to production by accident.
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      target:
+        description: 'Target GCP environment'
+        type: choice
+        options: [dev, prod]
+        default: dev
+      service:
+        description: 'Which service(s) to build and deploy'
+        type: choice
+        options: [both, web, worker]
+        default: both
+
+# id-token: write is MANDATORY. Without it GitHub will not mint the OIDC token
+# that google-github-actions/auth exchanges, and auth fails with a confusing
+# "unable to get ACTIONS_ID_TOKEN_REQUEST_URL".
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: deploy-aipostgen-${{ inputs.target || 'dev' }}
+  cancel-in-progress: false
+
+jobs:
+  config:
+    name: Resolve ${{ inputs.target || 'dev' }} config
+    runs-on: ubuntu-latest
+    outputs:
+      project_id: ${{ steps.r.outputs.project_id }}
+      region: ${{ steps.r.outputs.region }}
+      ar_repo: ${{ steps.r.outputs.ar_repo }}
+      wif_provider: ${{ steps.r.outputs.wif_provider }}
+      deploy_sa: ${{ steps.r.outputs.deploy_sa }}
+      image_tag: ${{ steps.r.outputs.image_tag }}
+    steps:
+      - id: r
+        env:
+          TARGET: ${{ inputs.target || 'dev' }}
+          V_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+          V_REGION: ${{ vars.GCP_REGION }}
+          V_AR_REPO: ${{ vars.GCP_AR_REPO }}
+          V_WIF_PROVIDER: ${{ vars.GCP_WIF_PROVIDER }}
+          V_DEPLOY_SA: ${{ vars.GCP_DEPLOY_SA }}
+        run: |
+          set -euo pipefail
+          if [ "$TARGET" = "dev" ]; then
+            PROJECT_ID="${V_PROJECT_ID:-edentist-dev}"
+            REGION="${V_REGION:-me-central2}"
+            AR_REPO="${V_AR_REPO:-me-central2-docker.pkg.dev/edentist-dev/edentist}"
+            WIF_PROVIDER="${V_WIF_PROVIDER:-projects/382344725728/locations/global/workloadIdentityPools/github-pool/providers/github-provider}"
+            DEPLOY_SA="${V_DEPLOY_SA:-github-deployer@edentist-dev.iam.gserviceaccount.com}"
+          else
+            # No defaults for prod - every value must be configured explicitly so
+            # a misconfigured dispatch cannot silently deploy somewhere unexpected.
+            PROJECT_ID="${V_PROJECT_ID:-}"; REGION="${V_REGION:-}"; AR_REPO="${V_AR_REPO:-}"
+            WIF_PROVIDER="${V_WIF_PROVIDER:-}"; DEPLOY_SA="${V_DEPLOY_SA:-}"
+            MISSING=""
+            [ -z "$PROJECT_ID" ] && MISSING="$MISSING GCP_PROJECT_ID"
+            [ -z "$REGION" ] && MISSING="$MISSING GCP_REGION"
+            [ -z "$AR_REPO" ] && MISSING="$MISSING GCP_AR_REPO"
+            [ -z "$WIF_PROVIDER" ] && MISSING="$MISSING GCP_WIF_PROVIDER"
+            [ -z "$DEPLOY_SA" ] && MISSING="$MISSING GCP_DEPLOY_SA"
+            if [ -n "$MISSING" ]; then
+              echo "::error::prod target requires these repo/environment variables:$MISSING"; exit 1
+            fi
+            if [ "$PROJECT_ID" = "edentist-dev" ]; then
+              echo "::error::prod target resolved to edentist-dev - refusing"; exit 1
+            fi
+          fi
+          {
+            echo "project_id=$PROJECT_ID"; echo "region=$REGION"; echo "ar_repo=$AR_REPO"
+            echo "wif_provider=$WIF_PROVIDER"; echo "deploy_sa=$DEPLOY_SA"
+            echo "image_tag=${GITHUB_SHA::7}"
+          } >> "$GITHUB_OUTPUT"
+
+  deploy-web:
+    name: Build & deploy aipostgen-web
+    needs: config
+    if: (inputs.service || 'both') == 'both' || (inputs.service || 'both') == 'web'
+    runs-on: ubuntu-latest
+    env:
+      PROJECT_ID: ${{ needs.config.outputs.project_id }}
+      REGION: ${{ needs.config.outputs.region }}
+      AR_REPO: ${{ needs.config.outputs.ar_repo }}
+      IMAGE_TAG: ${{ needs.config.outputs.image_tag }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Authenticate to GCP (Workload Identity Federation)
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ needs.config.outputs.wif_provider }}
+          service_account: ${{ needs.config.outputs.deploy_sa }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Build image on Cloud Build
+        run: |
+          set -euo pipefail
+          gcloud builds submit . \
+            --config=cloudbuild.cloudrun.yaml \
+            --region="$REGION" --project="$PROJECT_ID" \
+            --substitutions="_IMAGE=${AR_REPO}/aipostgen-web,_TAG=${IMAGE_TAG}"
+
+      # `gcloud builds submit` can exit 0 on a failed build, so assert the real
+      # status from an independent query rather than trusting the exit code.
+      - name: Verify build succeeded
+        run: |
+          set -euo pipefail
+          STATUS=$(gcloud builds list --region="$REGION" --project="$PROJECT_ID" \
+            --limit=1 --format='value(status)')
+          echo "build status: $STATUS"
+          [ "$STATUS" = "SUCCESS" ] || { echo "::error::build status $STATUS"; exit 1; }
+
+      - name: Deploy to Cloud Run
+        run: |
+          set -euo pipefail
+          gcloud run deploy aipostgen-web \
+            --image="${AR_REPO}/aipostgen-web:${IMAGE_TAG}" \
+            --region="$REGION" --project="$PROJECT_ID"
+
+      - name: Verify revision is serving
+        run: |
+          set -euo pipefail
+          READY=$(gcloud run services describe aipostgen-web --region="$REGION" \
+            --project="$PROJECT_ID" --format='value(status.conditions[0].status)')
+          echo "ready: $READY"
+          [ "$READY" = "True" ] || { echo "::error::revision not ready"; exit 1; }
+
+  deploy-worker:
+    name: Build & deploy aipostgen-worker
+    needs: config
+    if: (inputs.service || 'both') == 'both' || (inputs.service || 'both') == 'worker'
+    runs-on: ubuntu-latest
+    env:
+      PROJECT_ID: ${{ needs.config.outputs.project_id }}
+      REGION: ${{ needs.config.outputs.region }}
+      AR_REPO: ${{ needs.config.outputs.ar_repo }}
+      IMAGE_TAG: ${{ needs.config.outputs.image_tag }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Authenticate to GCP (Workload Identity Federation)
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ needs.config.outputs.wif_provider }}
+          service_account: ${{ needs.config.outputs.deploy_sa }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Build image on Cloud Build
+        run: |
+          set -euo pipefail
+          gcloud builds submit . \
+            --config=cloudbuild.worker.yaml \
+            --region="$REGION" --project="$PROJECT_ID" \
+            --substitutions="_IMAGE=${AR_REPO}/aipostgen-worker,_TAG=${IMAGE_TAG}"
+
+      - name: Verify build succeeded
+        run: |
+          set -euo pipefail
+          STATUS=$(gcloud builds list --region="$REGION" --project="$PROJECT_ID" \
+            --limit=1 --format='value(status)')
+          echo "build status: $STATUS"
+          [ "$STATUS" = "SUCCESS" ] || { echo "::error::build status $STATUS"; exit 1; }
+
+      - name: Deploy to Cloud Run
+        run: |
+          set -euo pipefail
+          gcloud run deploy aipostgen-worker \
+            --image="${AR_REPO}/aipostgen-worker:${IMAGE_TAG}" \
+            --region="$REGION" --project="$PROJECT_ID"
+
+      - name: Verify revision is serving
+        run: |
+          set -euo pipefail
+          READY=$(gcloud run services describe aipostgen-worker --region="$REGION" \
+            --project="$PROJECT_ID" --format='value(status.conditions[0].status)')
+          echo "ready: $READY"
+          [ "$READY" = "True" ] || { echo "::error::revision not ready"; exit 1; }
